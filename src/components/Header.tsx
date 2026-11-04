@@ -48,18 +48,17 @@ export default function Header({
 
         {/* Caixa Status & Quick Stats */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {ultimoConcurso && (
-            <button
-              onClick={onOpenGanhadores}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-950/40 border border-purple-500/30 hover:border-purple-400 text-purple-200 text-xs transition-all cursor-pointer group"
-              title="Clique para ver detalhes de ganhadores e cidades"
-            >
-              <Trophy className="w-3.5 h-3.5 text-amber-400 group-hover:scale-110 transition-transform" />
-              <span>
-                Último: <strong className="text-white">Concurso {ultimoConcurso.numero}</strong> ({ultimoConcurso.dataApuracao})
-              </span>
-            </button>
-          )}
+          <button
+            onClick={onOpenGanhadores}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-700/80 to-fuchsia-600/80 hover:from-purple-600 hover:to-fuchsia-500 border border-purple-400/50 text-white font-medium text-xs transition-all cursor-pointer shadow-md shadow-purple-900/40 group active:scale-95"
+            title="Clique para ver dezenas sorteadas, ganhadores, valores pagos e histórico de consultas"
+          >
+            <Trophy className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
+            <span>
+              <strong>★ Ver Último Concurso</strong>
+              {ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}
+            </span>
+          </button>
 
           {/* Quick Balance */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs">

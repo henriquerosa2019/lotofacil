@@ -72,6 +72,10 @@ export default function Home() {
     if (ultimoConcurso) {
       setModalGanhadoresConcurso(ultimoConcurso);
       setModalGanhadoresAberto(true);
+    } else if (historico && historico.length > 0) {
+      const ultimoSeed = historico[historico.length - 1];
+      setModalGanhadoresConcurso(ultimoSeed);
+      setModalGanhadoresAberto(true);
     }
   };
 
@@ -171,6 +175,7 @@ export default function Home() {
           {activeTab === "gerador" && (
             <AbaGeradorGrupos
               ultimoConcurso={ultimoConcurso}
+              jogos={jogos}
               onJogoRegistrado={carregarDadosLocais}
               onIrParaAfericao={() => setActiveTab("afericao")}
             />
@@ -217,7 +222,7 @@ export default function Home() {
             Lotofácil AI — Desenvolvido com base nos 3.760+ concursos oficiais da Caixa Econômica Federal.
           </span>
           <span className="text-[11px] text-gray-600">
-            Preço oficial da aposta de 15 dezenas: R$ 3,00. Jogue com responsabilidade.
+            Preço oficial da aposta de 15 dezenas: R$ 3,50. Jogue com responsabilidade.
           </span>
         </div>
       </footer>

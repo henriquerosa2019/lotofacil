@@ -3,8 +3,8 @@
 import React, { useState } from "react";
 import { ConcursoLotofacil, JogoRegistrado } from "@/lib/types";
 import { GRUPOS_PADRAO, VALOR_APOSTA_15 } from "@/lib/lotofacil-engine";
-import { saveJogoRegistrado } from "@/lib/storage";
-import { Calculator, Calendar, Coins, CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react";
+import { saveJogoRegistrado, deleteJogoRegistrado } from "@/lib/storage";
+import { Calculator, Calendar, Coins, CheckCircle2, ShieldCheck, ArrowRight, Undo2 } from "lucide-react";
 
 interface AbaTeimosinhaProps {
   ultimoConcurso: ConcursoLotofacil | null;
@@ -20,6 +20,7 @@ export default function AbaTeimosinha({
   const [jogosSelecionados, setJogosSelecionados] = useState<number>(3); // 1, 2 ou 3 jogos
   const [teimosinhaOpcao, setTeimosinhaOpcao] = useState<number>(24);
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
+  const [ultimosRegistradosIds, setUltimosRegistradosIds] = useState<string[]>([]);
 
   const concursoAtual = ultimoConcurso?.numero || 3760;
   const proximoConcurso = concursoAtual + 1;
@@ -37,6 +38,7 @@ export default function AbaTeimosinha({
 
   const handleRegistrarCombo = () => {
     const gruposParaRegistrar = GRUPOS_PADRAO.slice(0, jogosSelecionados);
+    const novosIds: string[] = [];
     gruposParaRegistrar.forEach((g) => {
       const custo = teimosinhaOpcao * VALOR_APOSTA_15;
       const novoJogo: JogoRegistrado = {
@@ -54,13 +56,22 @@ export default function AbaTeimosinha({
         totalGanho: 0,
       };
       saveJogoRegistrado(novoJogo);
+      novosIds.push(novoJogo.id);
     });
 
+    setUltimosRegistradosIds(novosIds);
     onJogoRegistrado();
     setSucessoMsg(
       `Sucesso! ${jogosSelecionados} jogos registrados para a Teimosinha de ${teimosinhaOpcao} concursos (Total: ${custoTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}).`
     );
-    setTimeout(() => setSucessoMsg(null), 6000);
+  };
+
+  const handleDesfazerCombo = () => {
+    ultimosRegistradosIds.forEach((id) => deleteJogoRegistrado(id));
+    setUltimosRegistradosIds([]);
+    onJogoRegistrado();
+    setSucessoMsg("Registro cancelado! Os jogos foram removidos com sucesso.");
+    setTimeout(() => setSucessoMsg(null), 4000);
   };
 
   return (
@@ -72,23 +83,37 @@ export default function AbaTeimosinha({
           Simulador de Custos e Planejamento da Teimosinha
         </h2>
         <p className="text-xs text-gray-400 max-w-3xl leading-relaxed">
-          O valor oficial da aposta simples de 15 dezenas na Lotofácil é de <strong>R$ 3,00</strong>.
+          O valor oficial da aposta simples de 15 dezenas na Lotofácil é de <strong>R$ 3,50</strong>.
           Simule os custos exatos para apostar individualmente ou com o conjunto de 3 Grupos de Ouro ao longo das opções oficiais de repetição da Caixa (1 a 24 concursos).
         </p>
       </div>
 
       {sucessoMsg && (
-        <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs flex items-center justify-between animate-in fade-in">
+        <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>{sucessoMsg}</span>
           </div>
-          <button
-            onClick={onIrParaAfericao}
-            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shrink-0 ml-2"
-          >
-            Ir para Aferição
-          </button>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            {ultimosRegistradosIds.length > 0 && (
+              <button
+                type="button"
+                onClick={handleDesfazerCombo}
+                className="px-3 py-1.5 rounded-lg bg-rose-600/30 hover:bg-rose-600 border border-rose-500/50 text-rose-200 hover:text-white font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Desfazer e cancelar estes jogos registrados"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                Desfazer Registro
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onIrParaAfericao}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shrink-0 cursor-pointer"
+            >
+              Ir para Aferição
+            </button>
+          </div>
         </div>
       )}
 
@@ -204,7 +229,7 @@ export default function AbaTeimosinha({
       <div className="p-4 md:p-5 rounded-2xl bg-[#121827] border border-gray-800 space-y-3">
         <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
           <Coins className="w-4 h-4 text-amber-400" />
-          Tabela Comparativa de Teimosinhas Oficiais da Caixa (R$ 3,00 / jogo)
+          Tabela Comparativa de Teimosinhas Oficiais da Caixa (R$ 3,50 / jogo)
         </h4>
         <div className="overflow-x-auto rounded-xl border border-gray-800">
           <table className="w-full text-xs text-left">
@@ -225,13 +250,13 @@ export default function AbaTeimosinha({
                   </td>
                   <td className="py-2 px-3 text-gray-400">{op.semanas}</td>
                   <td className="py-2 px-3 text-right font-mono text-gray-300">
-                    {(op.concursos * 3.0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    {(op.concursos * 1 * VALOR_APOSTA_15).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </td>
                   <td className="py-2 px-3 text-right font-mono text-gray-300">
-                    {(op.concursos * 6.0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    {(op.concursos * 2 * VALOR_APOSTA_15).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </td>
                   <td className="py-2 px-3 text-right font-mono font-bold text-emerald-400">
-                    {(op.concursos * 9.0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    {(op.concursos * 3 * VALOR_APOSTA_15).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                   </td>
                 </tr>
               ))}

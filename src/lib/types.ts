@@ -21,6 +21,27 @@ export interface ConcursoLotofacil {
   }>;
 }
 
+export interface HistoricoConsultaConcurso {
+  numero: number;
+  dataApuracao: string;
+  consultadoEm: string;
+  dezenas: number[];
+  acumulado?: boolean;
+  ganhadores15: number;
+  valor15: number;
+  cidadesGanhadores: Array<{
+    ganhadores: number;
+    municipio: string;
+    uf: string;
+  }>;
+  rateioCompleto: Array<{
+    descricaoFaixa: string;
+    faixa: number;
+    numeroDeGanhadores: number;
+    valorPremio: number;
+  }>;
+}
+
 export interface GrupoDezenas {
   id: string; // ex: "grupo-1", "grupo-2", "grupo-3"
   nome: string;

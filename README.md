@@ -15,23 +15,29 @@ Aplicativo web completo de análise probabilística, gerador de grupos ranqueado
    - Apresenta os **3 Grupos de Ouro (15 dezenas cada)** calibrados no epicentro das probabilidades matemáticas (Score 10.0 / 10.0).
    - Garantia de **100% de ineditismo** (nenhum dos 3 grupos jamais repetiu 15 pontos na história).
    - Botão para **Apostar / Registrar o Grupo** para monitoramento.
+   - Opção para **Desfazer o Jogo** / cancelar a aposta a qualquer momento com 1 clique.
 
 3. **Simulador de Custos & Teimosinha:**
-   - Preço oficial da aposta simples: **R$ 3,00**.
+   - Preço oficial da aposta simples: **R$ 3,50**.
    - Simulação instantânea para 1, 2 ou 3 jogos nas janelas oficiais da Teimosinha (**1, 3, 6, 12, 18 e 24 concursos**).
-   - Projeção de amortização e custo total.
+   - Projeção de amortização e custo total (ex: 24 concursos = R$ 84,00 para 1 jogo, R$ 252,00 para 3 jogos).
+   - Opção para **Desfazer Registro** de combos imediatamente.
 
-4. **Aferição Oficial em Tempo Real (API Caixa):**
+4. **Botão "Ver Último Concurso" & Histórico de Consultas:**
+   - Botão destacado no topo da tela que abre diretamente as dezenas sorteadas, número de ganhadores e valores pagos de qualquer concurso oficial.
+   - **Histórico Automático**: cada concurso consultado fica gravado localmente na aba de histórico para consulta rápida sem gastar internet.
+
+5. **Aferição Oficial em Tempo Real (API Caixa):**
    - Conecta ao servidor oficial da Caixa Econômica Federal (`servicebus2.caixa.gov.br`).
    - Compara as 15 dezenas dos seus jogos registrados com os resultados reais sorteados.
    - Aponta a quantidade de acertos (11 a 15), destaca em verde as dezenas que saíram e calcula automaticamente o valor ganho em Reais somando ao saldo.
 
-5. **Detalhamento Oficial de Ganhadores de 15 Pontos:**
+6. **Detalhamento Oficial de Ganhadores de 15 Pontos:**
    - Quantidade de apostas ganhadoras de 15 pontos.
    - Cidades e Estados (UF) dos ganhadores da faixa máxima.
    - Prêmio pago por ganhador e rateio de todas as outras faixas (14, 13, 12 e 11 acertos).
 
-6. **Gestão Financeira & Controle de Saques:**
+7. **Gestão Financeira & Controle de Saques:**
    - Total Investido vs. Total Premiado vs. Lucro Líquido (ROI).
    - Registro de saques de prêmios por concurso (data, valor sacado e local do resgate).
 

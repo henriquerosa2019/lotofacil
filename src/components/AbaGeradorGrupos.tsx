@@ -3,18 +3,28 @@
 import React, { useState } from "react";
 import { GrupoDezenas, ConcursoLotofacil, JogoRegistrado } from "@/lib/types";
 import { GRUPOS_PADRAO, VALOR_APOSTA_15 } from "@/lib/lotofacil-engine";
-import { saveJogoRegistrado } from "@/lib/storage";
+import { saveJogoRegistrado, deleteJogoRegistrado, undoUltimoJogo } from "@/lib/storage";
 import VolanteGrid from "./VolanteGrid";
-import { Sparkles, CheckCircle2, ShieldCheck, Flame, Scale, Hash, LayoutGrid, Activity, Play } from "lucide-react";
+import {
+  Sparkles,
+  CheckCircle2,
+  ShieldCheck,
+  Play,
+  Undo2,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 
 interface AbaGeradorGruposProps {
   ultimoConcurso: ConcursoLotofacil | null;
+  jogos?: JogoRegistrado[];
   onJogoRegistrado: () => void;
   onIrParaAfericao: () => void;
 }
 
 export default function AbaGeradorGrupos({
   ultimoConcurso,
+  jogos = [],
   onJogoRegistrado,
   onIrParaAfericao,
 }: AbaGeradorGruposProps) {
@@ -22,11 +32,10 @@ export default function AbaGeradorGrupos({
   const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string>("grupo-1");
   const [teimosinhaQtd, setTeimosinhaQtd] = useState<number>(24);
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
+  const [ultimoJogoId, setUltimoJogoId] = useState<string | null>(null);
 
   const concursoAtual = ultimoConcurso?.numero || 3760;
   const proximoConcurso = concursoAtual + 1;
-
-  const grupoAtivo = grupos.find((g) => g.id === grupoSelecionadoId) || grupos[0];
 
   const handleRegistrarAposta = (grupo: GrupoDezenas) => {
     const custo = teimosinhaQtd * VALOR_APOSTA_15;
@@ -46,11 +55,24 @@ export default function AbaGeradorGrupos({
     };
 
     saveJogoRegistrado(novoJogo);
+    setUltimoJogoId(novoJogo.id);
     onJogoRegistrado();
     setSucessoMsg(
       `Jogo registrado com sucesso! ${grupo.nome} agora está ativo para aferição do Concurso ${novoJogo.concursoInicial} ao ${novoJogo.concursoFinal}.`
     );
-    setTimeout(() => setSucessoMsg(null), 5000);
+  };
+
+  const handleDesfazerJogo = (idParaRemover?: string) => {
+    const id = idParaRemover || ultimoJogoId;
+    if (id) {
+      deleteJogoRegistrado(id);
+    } else {
+      undoUltimoJogo();
+    }
+    onJogoRegistrado();
+    setUltimoJogoId(null);
+    setSucessoMsg("Jogo desfeito e removido com sucesso!");
+    setTimeout(() => setSucessoMsg(null), 4000);
   };
 
   return (
@@ -83,29 +105,43 @@ export default function AbaGeradorGrupos({
               onChange={(e) => setTeimosinhaQtd(parseInt(e.target.value, 10))}
               className="bg-black/40 text-purple-300 font-bold border border-purple-500/30 rounded px-2 py-1 outline-none"
             >
-              <option value={1}>1 Concurso (R$ 3,00)</option>
-              <option value={3}>3 Concursos (R$ 9,00)</option>
-              <option value={6}>6 Concursos (R$ 18,00)</option>
-              <option value={12}>12 Concursos (R$ 36,00)</option>
-              <option value={18}>18 Concursos (R$ 54,00)</option>
-              <option value={24}>24 Concursos (R$ 72,00)</option>
+              <option value={1}>1 Concurso (R$ 3,50)</option>
+              <option value={3}>3 Concursos (R$ 10,50)</option>
+              <option value={6}>6 Concursos (R$ 21,00)</option>
+              <option value={12}>12 Concursos (R$ 42,00)</option>
+              <option value={18}>18 Concursos (R$ 63,00)</option>
+              <option value={24}>24 Concursos (R$ 84,00)</option>
             </select>
           </div>
         </div>
       </div>
 
       {sucessoMsg && (
-        <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs flex items-center justify-between animate-in fade-in">
+        <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span>{sucessoMsg}</span>
           </div>
-          <button
-            onClick={onIrParaAfericao}
-            className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shrink-0 ml-2"
-          >
-            Ir para Aferição
-          </button>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            {ultimoJogoId && (
+              <button
+                type="button"
+                onClick={() => handleDesfazerJogo(ultimoJogoId)}
+                className="px-3 py-1.5 rounded-lg bg-rose-600/30 hover:bg-rose-600 border border-rose-500/50 text-rose-200 hover:text-white font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
+                title="Desfazer e cancelar este jogo"
+              >
+                <Undo2 className="w-3.5 h-3.5" />
+                Desfazer Jogo
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onIrParaAfericao}
+              className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all cursor-pointer"
+            >
+              Ir para Aferição
+            </button>
+          </div>
         </div>
       )}
 
@@ -201,6 +237,52 @@ export default function AbaGeradorGrupos({
           );
         })}
       </div>
+
+      {/* Seção de Jogos Registrados & Opção de Desfazer */}
+      {jogos && jogos.length > 0 && (
+        <div className="p-4 md:p-5 rounded-2xl bg-[#121827] border border-gray-800 space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+              <RotateCcw className="w-4 h-4 text-purple-400" />
+              Seus Jogos Registrados Ativos ({jogos.length})
+            </h4>
+            <span className="text-[11px] text-gray-500">
+              Você pode desfazer qualquer jogo a qualquer momento
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {jogos.map((j) => (
+              <div
+                key={j.id}
+                className="p-3 rounded-xl bg-gray-900/80 border border-gray-800 flex items-center justify-between gap-3 text-xs"
+              >
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <strong className="text-white">{j.grupoNome}</strong>
+                    <span className="text-[10px] text-purple-300 bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-800/50">
+                      {j.teimosinhaConcursos}x ({j.custoTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })})
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">
+                    Concurso {j.concursoInicial} ao {j.concursoFinal}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleDesfazerJogo(j.id)}
+                  className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/30 hover:border-rose-400 font-semibold text-[11px] flex items-center gap-1 transition-all cursor-pointer shrink-0"
+                  title="Desfazer e remover este jogo"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Desfazer
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
