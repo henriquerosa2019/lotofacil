@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { ConcursoLotofacil, JogoRegistrado, RegistroSaque } from "@/lib/types";
-import { getJogosRegistrados, getSaquesRegistrados, saveJogoRegistrado } from "@/lib/storage";
+import { getJogosRegistrados, getSaquesRegistrados, saveJogoRegistrado, saveHistoricoConsulta } from "@/lib/storage";
 import { apurarJogoComConcurso, gerarMelhoresQuinzenas } from "@/lib/lotofacil-engine";
 import historicalSeed from "@/lib/historical-seed.json";
 import Header from "@/components/Header";
@@ -111,27 +111,67 @@ export default function Home() {
     }
   };
 
-  const handleAbrirGanhadoresEspecifico = (c: ConcursoLotofacil) => {
-    // Apura qualquer jogo registrado que pertença a este concurso
-    const jogosSalvos = getJogosRegistrados();
-    let houveAlteracao = false;
+  /**
+   * Ao clicar no "olhinho" (Ganhadores) em Meus Jogos Registrados:
+   * Busca os dados completos do concurso na Caixa (ou cache),
+   * listando todos os ganhadores, locais (cidades/UF) e valores pagos.
+   */
+  const handleAbrirGanhadoresEspecifico = async (concursoParam: ConcursoLotofacil | number) => {
+    const num = typeof concursoParam === "number" ? concursoParam : concursoParam.numero;
+    let concCompleto: ConcursoLotofacil | null = null;
 
-    jogosSalvos.forEach((j) => {
-      if (c.numero >= j.concursoInicial && c.numero <= j.concursoFinal) {
-        const resAp = apurarJogoComConcurso(j, c);
-        if (resAp.pertenceAoConcurso) {
-          saveJogoRegistrado(resAp.jogoAtualizado);
-          houveAlteracao = true;
-        }
-      }
-    });
-
-    if (houveAlteracao) {
-      carregarDadosLocais();
+    // 1. Se for o último concurso já carregado com rateio e cidades:
+    if (ultimoConcurso && ultimoConcurso.numero === num && (ultimoConcurso.listaRateioPremio?.length || 0) > 0) {
+      concCompleto = ultimoConcurso;
     }
 
-    setModalGanhadoresConcurso(c);
-    setModalGanhadoresAberto(true);
+    // 2. Busca na API oficial pelo número do concurso para trazer cidades e rateio completo
+    if (!concCompleto) {
+      try {
+        setLoadingApi(true);
+        const res = await fetch(`/api/lotofacil/${num}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.sucesso && data.concurso) {
+            concCompleto = data.concurso as ConcursoLotofacil;
+          }
+        }
+      } catch (err) {
+        console.error(`Erro ao buscar dados completos do concurso ${num}:`, err);
+      } finally {
+        setLoadingApi(false);
+      }
+    }
+
+    // 3. Fallback se a API falhar: verifica no histórico local
+    if (!concCompleto) {
+      const seedFound = historico.find((h) => h.numero === num);
+      if (seedFound) concCompleto = seedFound;
+      else if (typeof concursoParam !== "number") concCompleto = concursoParam;
+    }
+
+    if (concCompleto) {
+      saveHistoricoConsulta(concCompleto);
+
+      // Apura qualquer jogo registrado que pertença a este concurso
+      const jogosSalvos = getJogosRegistrados();
+      let houveAlteracao = false;
+      jogosSalvos.forEach((j) => {
+        if (concCompleto && concCompleto.numero >= j.concursoInicial && concCompleto.numero <= j.concursoFinal) {
+          const resAp = apurarJogoComConcurso(j, concCompleto);
+          if (resAp.pertenceAoConcurso) {
+            saveJogoRegistrado(resAp.jogoAtualizado);
+            houveAlteracao = true;
+          }
+        }
+      });
+      if (houveAlteracao) {
+        carregarDadosLocais();
+      }
+
+      setModalGanhadoresConcurso(concCompleto);
+      setModalGanhadoresAberto(true);
+    }
   };
 
   const gruposAtuais = useMemo(() => {

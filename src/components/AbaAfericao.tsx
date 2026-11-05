@@ -29,7 +29,7 @@ import {
 interface AbaAfericaoProps {
   jogos: JogoRegistrado[];
   onAtualizarJogos: () => void;
-  onVisualizarGanhadoresConcurso: (c: ConcursoLotofacil) => void;
+  onVisualizarGanhadoresConcurso: (c: ConcursoLotofacil | number) => void;
   onIrParaGerador: () => void;
   ultimoConcurso: ConcursoLotofacil | null;
   gruposDisponiveis?: GrupoDezenas[];
@@ -864,16 +864,13 @@ export default function AbaAfericao({
                                 </span>
 
                                 <button
-                                  onClick={() =>
-                                    onVisualizarGanhadoresConcurso({
-                                      numero: ap.concurso,
-                                      dataApuracao: ap.data,
-                                      dezenas: ap.dezenasSorteadas,
-                                    })
-                                  }
-                                  className="text-[11px] text-purple-400 hover:text-purple-300 flex items-center gap-1 cursor-pointer"
+                                  type="button"
+                                  onClick={() => onVisualizarGanhadoresConcurso(ap.concurso)}
+                                  className="text-[11px] text-purple-400 hover:text-purple-300 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                                  title="Clique para ver todos os ganhadores, locais (cidades) e valores pagos deste concurso"
                                 >
-                                  <Eye className="w-3 h-3" /> Ganhadores
+                                  <Eye className="w-3.5 h-3.5 text-amber-300" />
+                                  <span>Ganhadores</span>
                                 </button>
                               </div>
                             </div>
