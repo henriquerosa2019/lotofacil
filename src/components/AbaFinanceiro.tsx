@@ -13,6 +13,7 @@ import {
   Calendar,
   Building,
   CheckCircle2,
+  Sparkles,
 } from "lucide-react";
 
 interface AbaFinanceiroProps {
@@ -32,13 +33,42 @@ export default function AbaFinanceiro({
   const [obsInput, setObsInput] = useState<string>("");
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
 
-  // Cálculos financeiros
+  // Cálculos financeiros consolidados
   const totalInvestido = jogos.reduce((acc, j) => acc + j.custoTotal, 0);
   const totalGanho = jogos.reduce((acc, j) => acc + j.totalGanho, 0);
   const saldoLiquido = totalGanho - totalInvestido;
 
   const totalSacado = saques.reduce((acc, s) => acc + s.valor, 0);
+  // Saldo acumulado a sacar (Total ganho menos o que já foi sacado)
   const saldoDisponivelSaque = Math.max(0, totalGanho - totalSacado);
+
+  // Lista todos os prêmios já apurados nos jogos registrados
+  const premiosApurados: Array<{
+    jogoId: string;
+    grupoNome: string;
+    concurso: number;
+    data: string;
+    acertos: number;
+    faixaPremio: string;
+    valorGanho: number;
+  }> = [];
+
+  jogos.forEach((j) => {
+    Object.values(j.apuracoes).forEach((ap) => {
+      if (ap.valorGanho > 0) {
+        premiosApurados.push({
+          jogoId: j.id,
+          grupoNome: j.grupoNome,
+          concurso: ap.concurso,
+          data: ap.data,
+          acertos: ap.acertos,
+          faixaPremio: ap.faixaPremio || `${ap.acertos} Acertos`,
+          valorGanho: ap.valorGanho,
+        });
+      }
+    });
+  });
+  premiosApurados.sort((a, b) => b.concurso - a.concurso);
 
   const handleCadastrarSaque = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,13 +100,13 @@ export default function AbaFinanceiro({
     setValorInput("");
     setObsInput("");
     setSucessoMsg(
-      `Saque de ${valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} do Concurso ${concurso} registrado com sucesso!`
+      `Saque de ${valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} do Concurso ${concurso} registrado com sucesso! O valor foi debitado do seu saldo acumulado a resgatar.`
     );
-    setTimeout(() => setSucessoMsg(null), 5000);
+    setTimeout(() => setSucessoMsg(null), 6000);
   };
 
   const handleExcluirSaque = (id: string) => {
-    if (confirm("Deseja remover este registro de saque?")) {
+    if (confirm("Deseja remover este registro de saque? O valor retornará ao saldo acumulado.")) {
       deleteSaqueRegistrado(id);
       onAtualizarSaques();
     }
@@ -91,7 +121,7 @@ export default function AbaFinanceiro({
           Gestão Financeira & Controle de Saques
         </h2>
         <p className="text-xs text-gray-400 max-w-3xl leading-relaxed">
-          Acompanhe o balanço de caixa consolidado de suas apostas, total de prêmios auferidos pela Caixa e registre os saques e resgates efetuados por concurso.
+          Acompanhe o balanço de caixa consolidado de suas apostas, total de prêmios acumulados na Caixa e registre os saques e resgates efetuados por concurso.
         </p>
       </div>
 
@@ -116,7 +146,7 @@ export default function AbaFinanceiro({
 
         <div className="p-4 rounded-xl bg-[#121827] border border-gray-800 space-y-1">
           <span className="text-xs text-gray-400 block flex items-center gap-1">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Total Premiado
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" /> Total Premiado Acumulado
           </span>
           <div className="text-xl md:text-2xl font-bold text-emerald-400 font-mono">
             {totalGanho.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
@@ -126,22 +156,17 @@ export default function AbaFinanceiro({
 
         <div className="p-4 rounded-xl bg-[#121827] border border-gray-800 space-y-1">
           <span className="text-xs text-gray-400 block flex items-center gap-1">
-            <Wallet className="w-3.5 h-3.5 text-purple-400" /> Saldo Líquido (ROI)
+            <Building className="w-3.5 h-3.5 text-purple-400" /> Total Já Sacado
           </span>
-          <div
-            className={`text-xl md:text-2xl font-bold font-mono ${
-              saldoLiquido >= 0 ? "text-emerald-400" : "text-rose-400"
-            }`}
-          >
-            {saldoLiquido >= 0 ? "+" : ""}
-            {saldoLiquido.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+          <div className="text-xl md:text-2xl font-bold text-purple-300 font-mono">
+            {totalSacado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
           </div>
-          <span className="text-[10px] text-gray-500">Retorno sobre o capital</span>
+          <span className="text-[10px] text-gray-500">{saques.length} resgate(s) registrado(s)</span>
         </div>
 
-        <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/30 to-[#121827] border border-emerald-500/30 space-y-1">
+        <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/40 via-[#121827] to-purple-950/30 border-2 border-emerald-500/50 space-y-1 shadow-lg shadow-emerald-950/20">
           <span className="text-xs text-emerald-300 block flex items-center gap-1 font-semibold">
-            <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400" /> Saldo a Resgatar
+            <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400" /> Saldo a Resgatar / Sacar
           </span>
           <div className="text-xl md:text-2xl font-bold text-emerald-300 font-mono">
             {saldoDisponivelSaque.toLocaleString("pt-BR", {
@@ -162,8 +187,41 @@ export default function AbaFinanceiro({
             Registrar Saque de Prêmio
           </h3>
           <p className="text-xs text-gray-400">
-            Quando você resgatar um prêmio na lotérica ou pelo app da Caixa, registre aqui para manter seu saldo atualizado.
+            Quando você resgatar um prêmio na lotérica ou pelo app da Caixa, registre aqui para debitar do saldo acumulado.
           </p>
+
+          {/* Atalhos Rápidos de Prêmios Apurados */}
+          {premiosApurados.length > 0 && (
+            <div className="space-y-2 p-3 rounded-xl bg-purple-950/30 border border-purple-500/30">
+              <span className="text-[11px] font-bold text-purple-300 flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-amber-300" />
+                Prêmios Apurados nos Concursos:
+              </span>
+              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                {premiosApurados.map((p, idx) => (
+                  <button
+                    key={`${p.jogoId}-${p.concurso}-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      setConcursoInput(p.concurso.toString());
+                      setValorInput(p.valorGanho.toFixed(2).replace(".", ","));
+                      setObsInput(`Resgate de prêmio (${p.acertos} acertos) - ${p.grupoNome}`);
+                    }}
+                    className="w-full text-left p-2 rounded-lg bg-gray-900/80 hover:bg-purple-900/40 border border-gray-800 hover:border-purple-500/40 text-xs flex items-center justify-between transition-all cursor-pointer group"
+                    title="Clique para preencher o formulário automaticamente com este prêmio"
+                  >
+                    <div>
+                      <strong className="text-white group-hover:text-purple-300">Concurso {p.concurso}</strong>
+                      <span className="text-gray-400 ml-1.5 text-[11px]">({p.grupoNome.split("—")[0]})</span>
+                    </div>
+                    <span className="font-bold font-mono text-emerald-400 text-xs">
+                      {p.valorGanho.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleCadastrarSaque} className="space-y-3 pt-1">
             <div>
@@ -171,7 +229,7 @@ export default function AbaFinanceiro({
               <input
                 type="number"
                 required
-                placeholder="Ex: 3820"
+                placeholder="Ex: 3760"
                 value={concursoInput}
                 onChange={(e) => setConcursoInput(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-white text-xs outline-none focus:border-purple-500 font-mono"
@@ -183,7 +241,7 @@ export default function AbaFinanceiro({
               <input
                 type="text"
                 required
-                placeholder="Ex: 30,00"
+                placeholder="Ex: 7,00"
                 value={valorInput}
                 onChange={(e) => setValorInput(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-white text-xs outline-none focus:border-purple-500 font-mono"
@@ -195,7 +253,7 @@ export default function AbaFinanceiro({
               <select
                 value={localInput}
                 onChange={(e) => setLocalInput(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-white text-xs outline-none focus:border-purple-500"
+                className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-white text-xs outline-none focus:border-purple-500 cursor-pointer"
               >
                 <option value="Casa Lotérica">Casa Lotérica</option>
                 <option value="Agência Caixa">Agência Caixa</option>
@@ -208,7 +266,7 @@ export default function AbaFinanceiro({
               <label className="text-xs text-gray-300 block mb-1">Observações (opcional):</label>
               <input
                 type="text"
-                placeholder="Ex: Resgate de 13 acertos do Grupo 01"
+                placeholder="Ex: Resgate de 11 acertos na Lotérica Central"
                 value={obsInput}
                 onChange={(e) => setObsInput(e.target.value)}
                 className="w-full px-3 py-2 rounded-xl bg-gray-900 border border-gray-800 text-white text-xs outline-none focus:border-purple-500"
@@ -217,7 +275,7 @@ export default function AbaFinanceiro({
 
             <button
               type="submit"
-              className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+              className="w-full py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer active:scale-98"
             >
               <CheckCircle2 className="w-4 h-4" />
               Salvar Registro de Saque
@@ -239,7 +297,7 @@ export default function AbaFinanceiro({
 
           {saques.length === 0 ? (
             <div className="p-8 text-center rounded-xl bg-gray-900/40 border border-gray-800 text-xs text-gray-500">
-              Nenhum saque registrado ainda. Conforme for resgatando seus prêmios nas lotéricas ou agências, use o formulário ao lado para registrar.
+              Nenhum saque registrado ainda. Conforme for resgatando seus prêmios nas lotéricas ou agências, use o formulário ao lado para registrar e abater do seu saldo acumulado.
             </div>
           ) : (
             <div className="overflow-x-auto rounded-xl border border-gray-800">
@@ -273,8 +331,8 @@ export default function AbaFinanceiro({
                       <td className="py-2.5 px-2 text-center">
                         <button
                           onClick={() => handleExcluirSaque(s.id)}
-                          className="p-1 rounded text-gray-500 hover:text-rose-400 transition-colors"
-                          title="Excluir saque"
+                          className="p-1 rounded text-gray-500 hover:text-rose-400 transition-colors cursor-pointer"
+                          title="Excluir este saque (estorna o valor para o saldo a resgatar)"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>

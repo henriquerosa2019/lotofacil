@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Sparkles, RefreshCw, Trophy, Wallet, Landmark } from "lucide-react";
+import { Sparkles, RefreshCw, Trophy, Wallet, ArrowDownCircle } from "lucide-react";
 import { ConcursoLotofacil } from "@/lib/types";
 
 interface HeaderProps {
@@ -10,7 +10,10 @@ interface HeaderProps {
   onRefreshApi: () => void;
   totalInvestido: number;
   totalGanhos: number;
+  totalSacado?: number;
+  saldoDisponivelSaque?: number;
   onOpenGanhadores: () => void;
+  onIrParaFinanceiro?: () => void;
 }
 
 export default function Header({
@@ -19,7 +22,10 @@ export default function Header({
   onRefreshApi,
   totalInvestido,
   totalGanhos,
+  totalSacado = 0,
+  saldoDisponivelSaque = 0,
   onOpenGanhadores,
+  onIrParaFinanceiro,
 }: HeaderProps) {
   const saldoLiquido = totalGanhos - totalInvestido;
 
@@ -47,11 +53,12 @@ export default function Header({
         </div>
 
         {/* Caixa Status & Quick Stats */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Botão Principal de Ver Resultado em Tempo Real */}
           <button
             onClick={onOpenGanhadores}
             className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-700/80 to-fuchsia-600/80 hover:from-purple-600 hover:to-fuchsia-500 border border-purple-400/50 text-white font-medium text-xs transition-all cursor-pointer shadow-md shadow-purple-900/40 group active:scale-95"
-            title="Clique para ver dezenas sorteadas, ganhadores, valores pagos e histórico de consultas"
+            title="Clique para buscar o concurso atual da Caixa em tempo real e conferir com seus jogos"
           >
             <Trophy className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
             <span>
@@ -60,10 +67,23 @@ export default function Header({
             </span>
           </button>
 
-          {/* Quick Balance */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs">
-            <Wallet className="w-3.5 h-3.5 text-gray-400" />
-            <span className="text-gray-400">Saldo:</span>
+          {/* Saldo Acumulado a Sacar (Debitado conforme saques) */}
+          <div
+            onClick={onIrParaFinanceiro}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/40 border border-emerald-500/40 text-xs cursor-pointer hover:bg-emerald-900/50 transition-all"
+            title="Prêmios acumulados disponíveis para saque. Clique para gerenciar saques."
+          >
+            <ArrowDownCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            <span className="text-gray-300 text-[11px] font-medium">Saldo em Conta:</span>
+            <span className="font-bold font-mono text-emerald-300">
+              {saldoDisponivelSaque.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </span>
+          </div>
+
+          {/* Saldo Líquido Consolidado */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 border border-gray-800 text-xs">
+            <Wallet className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <span className="text-gray-400 text-[11px]">Líquido:</span>
             <span
               className={`font-semibold font-mono ${
                 saldoLiquido >= 0 ? "text-emerald-400" : "text-rose-400"
@@ -78,7 +98,7 @@ export default function Header({
           <button
             onClick={onRefreshApi}
             disabled={loadingApi}
-            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all disabled:opacity-50"
+            className="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition-all disabled:opacity-50 cursor-pointer"
             title="Atualizar dados da Caixa"
           >
             <RefreshCw className={`w-4 h-4 ${loadingApi ? "animate-spin text-purple-400" : ""}`} />

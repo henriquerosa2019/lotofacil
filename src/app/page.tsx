@@ -3,8 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { ConcursoLotofacil, JogoRegistrado, RegistroSaque } from "@/lib/types";
 import { getJogosRegistrados, getSaquesRegistrados, saveJogoRegistrado } from "@/lib/storage";
-import { apurarJogoComConcurso } from "@/lib/lotofacil-engine";
-import { gerarMelhoresQuinzenas } from "@/lib/lotofacil-engine";
+import { apurarJogoComConcurso, gerarMelhoresQuinzenas } from "@/lib/lotofacil-engine";
 import historicalSeed from "@/lib/historical-seed.json";
 import Header from "@/components/Header";
 import AbaEstatisticas from "@/components/AbaEstatisticas";
@@ -36,7 +35,7 @@ export default function Home() {
     setSaques(getSaquesRegistrados());
   };
 
-  const buscarDadosCaixa = async () => {
+  const buscarDadosCaixa = async (): Promise<ConcursoLotofacil | null> => {
     setLoadingApi(true);
     try {
       const res = await fetch("/api/lotofacil");
@@ -44,7 +43,6 @@ export default function Home() {
         const data = await res.json();
         if (data.sucesso && data.concurso) {
           setUltimoConcurso(data.concurso);
-          // Se o concurso mais recente for mais novo que o seed, adiciona à lista
           setHistorico((prev) => {
             const existe = prev.some((c) => c.numero === data.concurso.numero);
             if (!existe) {
@@ -52,6 +50,7 @@ export default function Home() {
             }
             return prev;
           });
+          return data.concurso as ConcursoLotofacil;
         }
       }
     } catch (err) {
@@ -59,6 +58,7 @@ export default function Home() {
     } finally {
       setLoadingApi(false);
     }
+    return null;
   };
 
   useEffect(() => {
@@ -66,48 +66,47 @@ export default function Home() {
     buscarDadosCaixa();
   }, []);
 
+  // Cálculos financeiros consolidados
   const totalInvestido = jogos.reduce((acc, j) => acc + j.custoTotal, 0);
   const totalGanhos = jogos.reduce((acc, j) => acc + j.totalGanho, 0);
+  const totalSacado = saques.reduce((acc, s) => acc + s.valor, 0);
+  const saldoDisponivelSaque = Math.max(0, totalGanhos - totalSacado);
 
+  /**
+   * Ao clicar em "Ver Resultado (Caixa)":
+   * 1. Busca o concurso atual da Caixa em tempo real.
+   * 2. Compara com os jogos registrados (grupos da IA ou personalizados).
+   * 3. Se houver acertos, grava a apuração no histórico e acumula o saldo.
+   * 4. Abre o modal com os dados oficiais e o cruzamento dos acertos.
+   */
   const handleAbrirGanhadoresUltimo = async () => {
-    let conc = ultimoConcurso;
-    try {
-      setLoadingApi(true);
-      const res = await fetch("/api/lotofacil");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.sucesso && data.concurso) {
-          conc = data.concurso;
-          setUltimoConcurso(conc);
+    const concApi = await buscarDadosCaixa();
+    let conc = concApi || ultimoConcurso;
 
-          // Apura automaticamente qualquer jogo registrado que pertença a este concurso
-          const jogosSalvos = getJogosRegistrados();
-          let houveAlteracao = false;
-          jogosSalvos.forEach((j) => {
-            if (conc && conc.numero >= j.concursoInicial && conc.numero <= j.concursoFinal) {
-              const resAp = apurarJogoComConcurso(j, conc);
-              if (resAp.pertenceAoConcurso) {
-                saveJogoRegistrado(resAp.jogoAtualizado);
-                houveAlteracao = true;
-              }
-            }
-          });
-          if (houveAlteracao) {
-            carregarDadosLocais();
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Erro ao buscar dados da Caixa:", e);
-    } finally {
-      setLoadingApi(false);
+    if (!conc && historico && historico.length > 0) {
+      conc = historico[historico.length - 1];
     }
 
     if (conc) {
+      // Apura qualquer jogo registrado que pertença a este concurso
+      const jogosSalvos = getJogosRegistrados();
+      let houveAlteracao = false;
+
+      jogosSalvos.forEach((j) => {
+        if (conc && conc.numero >= j.concursoInicial && conc.numero <= j.concursoFinal) {
+          const resAp = apurarJogoComConcurso(j, conc);
+          if (resAp.pertenceAoConcurso) {
+            saveJogoRegistrado(resAp.jogoAtualizado);
+            houveAlteracao = true;
+          }
+        }
+      });
+
+      if (houveAlteracao) {
+        carregarDadosLocais();
+      }
+
       setModalGanhadoresConcurso(conc);
-      setModalGanhadoresAberto(true);
-    } else if (historico && historico.length > 0) {
-      setModalGanhadoresConcurso(historico[historico.length - 1]);
       setModalGanhadoresAberto(true);
     }
   };
@@ -116,6 +115,7 @@ export default function Home() {
     // Apura qualquer jogo registrado que pertença a este concurso
     const jogosSalvos = getJogosRegistrados();
     let houveAlteracao = false;
+
     jogosSalvos.forEach((j) => {
       if (c.numero >= j.concursoInicial && c.numero <= j.concursoFinal) {
         const resAp = apurarJogoComConcurso(j, c);
@@ -125,9 +125,11 @@ export default function Home() {
         }
       }
     });
+
     if (houveAlteracao) {
       carregarDadosLocais();
     }
+
     setModalGanhadoresConcurso(c);
     setModalGanhadoresAberto(true);
   };
@@ -145,7 +147,10 @@ export default function Home() {
         onRefreshApi={buscarDadosCaixa}
         totalInvestido={totalInvestido}
         totalGanhos={totalGanhos}
+        totalSacado={totalSacado}
+        saldoDisponivelSaque={saldoDisponivelSaque}
         onOpenGanhadores={handleAbrirGanhadoresUltimo}
+        onIrParaFinanceiro={() => setActiveTab("financeiro")}
       />
 
       {/* Main Container */}
@@ -202,6 +207,11 @@ export default function Home() {
             >
               <Wallet className="w-4 h-4" />
               <span>Financeiro & Saques</span>
+              {saldoDisponivelSaque > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 ml-1">
+                  R$ {saldoDisponivelSaque.toFixed(0)}
+                </span>
+              )}
             </button>
           </nav>
         </div>
@@ -235,6 +245,8 @@ export default function Home() {
               ultimoConcurso={ultimoConcurso}
               gruposDisponiveis={gruposAtuais}
               onVerResultado={handleAbrirGanhadoresUltimo}
+              saldoDisponivelSaque={saldoDisponivelSaque}
+              onIrParaFinanceiro={() => setActiveTab("financeiro")}
             />
           )}
 
@@ -248,12 +260,17 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Modal de Detalhamento de Ganhadores de 15 Pontos */}
+      {/* Modal de Detalhamento de Ganhadores & Cruzamento Oficial */}
       <ModalGanhadores
         concurso={modalGanhadoresConcurso}
         isOpen={modalGanhadoresAberto}
         onClose={() => setModalGanhadoresAberto(false)}
         jogos={jogos}
+        saldoDisponivelSaque={saldoDisponivelSaque}
+        onIrParaFinanceiro={() => {
+          setModalGanhadoresAberto(false);
+          setActiveTab("financeiro");
+        }}
       />
 
       {/* Footer */}

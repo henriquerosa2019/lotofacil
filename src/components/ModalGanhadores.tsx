@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Trophy, MapPin, Users, DollarSign, Calendar, History, Trash2, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
+import { X, Trophy, MapPin, Users, DollarSign, Calendar, History, Trash2, CheckCircle2, AlertCircle, Sparkles, Wallet } from "lucide-react";
 import { ConcursoLotofacil, HistoricoConsultaConcurso, JogoRegistrado } from "@/lib/types";
 import { saveHistoricoConsulta, getHistoricoConsultas, deleteHistoricoConsulta } from "@/lib/storage";
 
@@ -11,6 +11,8 @@ interface ModalGanhadoresProps {
   onClose: () => void;
   onSelecionarConcursoHistorico?: (c: ConcursoLotofacil) => void;
   jogos?: JogoRegistrado[];
+  saldoDisponivelSaque?: number;
+  onIrParaFinanceiro?: () => void;
 }
 
 export default function ModalGanhadores({
@@ -19,6 +21,8 @@ export default function ModalGanhadores({
   onClose,
   onSelecionarConcursoHistorico,
   jogos = [],
+  saldoDisponivelSaque = 0,
+  onIrParaFinanceiro,
 }: ModalGanhadoresProps) {
   const [activeTab, setActiveTab] = useState<"detalhes" | "historico">("detalhes");
   const [historicoSalvo, setHistoricoSalvo] = useState<HistoricoConsultaConcurso[]>([]);
@@ -271,11 +275,23 @@ export default function ModalGanhadores({
                         </div>
 
                         {isPremiado && (
-                          <div className="flex items-center justify-between text-xs bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/40">
-                            <span className="text-gray-300">Premiação na Caixa Econômica:</span>
-                            <strong className="text-emerald-300 font-mono text-sm font-bold">
-                              {valorGanho.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-                            </strong>
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs bg-emerald-950/40 p-2.5 rounded-lg border border-emerald-500/40">
+                            <div>
+                              <span className="text-gray-300 block">Premiação ganha neste concurso:</span>
+                              <strong className="text-emerald-300 font-mono text-base font-bold">
+                                {valorGanho.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                              </strong>
+                            </div>
+                            {onIrParaFinanceiro && (
+                              <button
+                                type="button"
+                                onClick={onIrParaFinanceiro}
+                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto shadow-md shadow-emerald-900/40 active:scale-95"
+                              >
+                                <Wallet className="w-3.5 h-3.5" />
+                                <span>Registrar Saque deste Prêmio</span>
+                              </button>
+                            )}
                           </div>
                         )}
 

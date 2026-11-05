@@ -21,6 +21,9 @@ import {
   Plus,
   Minus,
   Search,
+  Wallet,
+  X,
+  Zap,
 } from "lucide-react";
 
 interface AbaAfericaoProps {
@@ -31,6 +34,20 @@ interface AbaAfericaoProps {
   ultimoConcurso: ConcursoLotofacil | null;
   gruposDisponiveis?: GrupoDezenas[];
   onVerResultado?: () => void;
+  saldoDisponivelSaque?: number;
+  onIrParaFinanceiro?: () => void;
+}
+
+interface CruzamentoVisual {
+  jogoId: string;
+  grupoNome: string;
+  concurso: number;
+  dataApuracao: string;
+  acertos: number;
+  dezenasSorteadas: number[];
+  dezenasAcertadas: number[];
+  faixaPremio: string;
+  valorGanho: number;
 }
 
 export default function AbaAfericao({
@@ -41,10 +58,15 @@ export default function AbaAfericao({
   ultimoConcurso,
   gruposDisponiveis = GRUPOS_PADRAO,
   onVerResultado,
+  saldoDisponivelSaque = 0,
+  onIrParaFinanceiro,
 }: AbaAfericaoProps) {
   const [aferindoId, setAferindoId] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "info" | "erro"; texto: string } | null>(null);
   const [ultimoJogoSalvoId, setUltimoJogoSalvoId] = useState<string | null>(null);
+
+  // Painel de cruzamento visual ativo (quando confere com a Caixa)
+  const [cruzamentoAtivo, setCruzamentoAtivo] = useState<CruzamentoVisual | null>(null);
 
   // Estados para Escolha do Jogo
   const [opcaoSelecionada, setOpcaoSelecionada] = useState<string>("grupo-1");
@@ -97,7 +119,7 @@ export default function AbaAfericao({
     setMinhasDezenas(embaralhado.slice(0, 15).sort((a, b) => a - b));
   };
 
-  // 1. SALVAR E REGISTRAR O JOGO (Sem cruzar antecipadamente com sorteios futuros)
+  // 1. SALVAR E REGISTRAR O JOGO
   const handleSalvarERegistrarJogo = () => {
     const dezenasParaApostar = dezenasAtuais;
     if (dezenasParaApostar.length !== 15) {
@@ -151,16 +173,19 @@ export default function AbaAfericao({
     } else {
       undoUltimoJogo();
     }
+    if (cruzamentoAtivo?.jogoId === id) {
+      setCruzamentoAtivo(null);
+    }
     onAtualizarJogos();
     setUltimoJogoSalvoId(null);
     setMensagem({ tipo: "info", texto: "Jogo desfeito e removido do monitoramento com sucesso!" });
     setTimeout(() => setMensagem(null), 4000);
   };
 
-  // 2. CONFERIR JOGO ESPECÍFICO COM A CAIXA
+  // 2. CONFERIR JOGO ESPECÍFICO COM A CAIXA E CRUZAR O RESULTADO IMEDIATAMENTE
   const handleAferirJogoIndividual = async (jogo: JogoRegistrado) => {
     setAferindoId(jogo.id);
-    setMensagem({ tipo: "info", texto: `Consultando Caixa para conferir o jogo "${jogo.grupoNome}"...` });
+    setMensagem({ tipo: "info", texto: `Consultando Caixa para conferir e cruzar o resultado de "${jogo.grupoNome}"...` });
 
     try {
       const resLatest = await fetch("/api/lotofacil");
@@ -173,6 +198,7 @@ export default function AbaAfericao({
 
       // Se o último concurso sorteado na Caixa ainda for anterior ao concurso do jogo
       if (ultimoOficial.numero < jogo.concursoInicial) {
+        setCruzamentoAtivo(null);
         setMensagem({
           tipo: "info",
           texto: `O último concurso apurado pela Caixa é o C.${ultimoOficial.numero}. O seu jogo pertence ao C.${jogo.concursoInicial} e será conferido assim que a Caixa realizar a apuração deste concurso!`,
@@ -206,10 +232,27 @@ export default function AbaAfericao({
       saveJogoRegistrado(jogoAtualizado);
       onAtualizarJogos();
 
+      // Ativa o cruzamento visual com os dados mais recentes apurados
+      const apuracoes = Object.values(jogoAtualizado.apuracoes).sort((a, b) => b.concurso - a.concurso);
+      if (apuracoes.length > 0) {
+        const apMaisRecente = apuracoes[0];
+        setCruzamentoAtivo({
+          jogoId: jogoAtualizado.id,
+          grupoNome: jogoAtualizado.grupoNome,
+          concurso: apMaisRecente.concurso,
+          dataApuracao: apMaisRecente.data,
+          acertos: apMaisRecente.acertos,
+          dezenasSorteadas: apMaisRecente.dezenasSorteadas,
+          dezenasAcertadas: apMaisRecente.dezenasAcertadas,
+          faixaPremio: apMaisRecente.faixaPremio || "Não premiado",
+          valorGanho: apMaisRecente.valorGanho,
+        });
+      }
+
       if (houveAlgumaApuracao) {
         setMensagem({
           tipo: "sucesso",
-          texto: `Conferência realizada! Total ganho apurado: R$ ${jogoAtualizado.totalGanho.toFixed(2)}.`,
+          texto: `Resultado cruzado com sucesso! ${jogoAtualizado.grupoNome} obteve ${apuracoes[0]?.acertos || 0} acertos no Concurso ${apuracoes[0]?.concurso || ""}. Saldo acumulado atualizado!`,
         });
       }
     } catch (err: any) {
@@ -232,13 +275,21 @@ export default function AbaAfericao({
               <span className="text-xs text-amber-300 font-semibold flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" /> Vinculação por Concurso Oficial
               </span>
+              <div
+                onClick={onIrParaFinanceiro}
+                className="ml-auto sm:ml-2 flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold cursor-pointer hover:bg-emerald-500/30 transition-all"
+                title="Saldo acumulado de prêmios disponível em conta até o saque"
+              >
+                <Wallet className="w-3 h-3 text-emerald-400" />
+                <span>Saldo em Conta: {saldoDisponivelSaque.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+              </div>
             </div>
             <h2 className="text-base md:text-lg font-bold text-white mt-1 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
               Escolha uma Opção de Grupo e Registre seu Jogo
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              O bilhete é registrado com o número do concurso que você vai disputar. A conferência é feita quando você clica em <strong>Ver Resultado</strong>.
+              O bilhete é registrado com o número do concurso que você vai disputar. A conferência é feita quando você clica em <strong>Ver Resultado</strong> ou em <strong>Conferir com a Caixa</strong>.
             </p>
           </div>
 
@@ -468,6 +519,104 @@ export default function AbaAfericao({
         </div>
       </div>
 
+      {/* PAINEL DE CRUZAMENTO VISUAL ATIVO (Ao clicar em Conferir com a Caixa) */}
+      {cruzamentoAtivo && (
+        <div className="p-5 md:p-6 rounded-2xl bg-gradient-to-br from-emerald-950/60 via-[#121827] to-purple-950/40 border-2 border-emerald-500/60 shadow-2xl shadow-emerald-950/30 space-y-4 animate-in fade-in">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500 text-black uppercase tracking-wider flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 fill-current" />
+                  Resultado da Conferência Oficial
+                </span>
+                <span className="text-xs text-gray-300 font-mono">
+                  Concurso {cruzamentoAtivo.concurso} ({cruzamentoAtivo.dataApuracao})
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-white mt-1">
+                {cruzamentoAtivo.grupoNome}
+              </h3>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <span className="text-xs text-gray-400 block">Acertos neste Sorteio:</span>
+                <div className="text-2xl md:text-3xl font-extrabold text-emerald-400 font-mono">
+                  {cruzamentoAtivo.acertos} ACERTOS
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCruzamentoAtivo(null)}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all cursor-pointer"
+                title="Fechar resultado visual"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Destaque do Prêmio e Status */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block">Faixa de Premiação:</span>
+              <strong className="text-sm text-white mt-0.5 block">
+                {cruzamentoAtivo.faixaPremio}
+              </strong>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800">
+              <span className="text-xs text-gray-400 block">Valor Ganho na Caixa:</span>
+              <strong className="text-base text-emerald-400 font-mono font-bold mt-0.5 block">
+                {cruzamentoAtivo.valorGanho.toLocaleString("pt-BR", {
+                  style: "currency",
+                  currency: "BRL",
+                })}
+              </strong>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 flex items-center justify-between">
+              <div>
+                <span className="text-xs text-gray-400 block">Status:</span>
+                <strong className={`text-xs mt-0.5 block ${cruzamentoAtivo.acertos >= 11 ? "text-emerald-400 font-bold" : "text-gray-400"}`}>
+                  {cruzamentoAtivo.acertos >= 11 ? "BILHETE PREMIADO! 🏆" : "Sem premiação neste concurso"}
+                </strong>
+                {cruzamentoAtivo.valorGanho > 0 && (
+                  <span className="text-[10px] text-emerald-300 font-semibold block mt-0.5">
+                    ✓ Valor somado ao Saldo em Conta
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Volante Visual de Dezenas Sorteadas vs Acertadas */}
+          <div className="space-y-2 pt-1">
+            <span className="text-xs text-gray-400 font-medium block">
+              Dezenas Sorteadas da Caixa vs. Acertos do Seu Jogo (acertos em verde esmeralda):
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {cruzamentoAtivo.dezenasSorteadas.map((num) => {
+                const acertou = cruzamentoAtivo.dezenasAcertadas.includes(num);
+                return (
+                  <span
+                    key={num}
+                    className={`w-9 h-9 rounded-xl text-xs font-mono flex items-center justify-center font-bold ${
+                      acertou
+                        ? "bg-emerald-600 text-white border-2 border-emerald-400 shadow-lg shadow-emerald-600/50 scale-105"
+                        : "bg-gray-800/60 text-gray-500 border border-gray-700/50"
+                    }`}
+                  >
+                    {num.toString().padStart(2, "0")}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Notificação de Feedback */}
       {mensagem && (
         <div
@@ -600,12 +749,12 @@ export default function AbaAfericao({
                         </span>
                       </div>
 
-                      {/* Botão de Conferência Individual */}
+                      {/* Botão de Conferência Individual com Cruzamento Imediato */}
                       <button
                         onClick={() => handleAferirJogoIndividual(jogo)}
                         disabled={isAferindo}
                         className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-purple-600/20 cursor-pointer"
-                        title="Verifica se este concurso já correu na Caixa e atualiza os acertos"
+                        title="Cruza as dezenas deste jogo com o resultado oficial da Caixa e exibe acertos e prêmios na hora"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isAferindo ? "animate-spin" : ""}`} />
                         {isAferindo ? "Conferindo..." : "Conferir com a Caixa"}
