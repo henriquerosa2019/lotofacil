@@ -55,7 +55,7 @@ export default function Header({
           >
             <Trophy className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
             <span>
-              <strong>★ Ver Último Concurso</strong>
+              <strong>★ Ver Resultado (Caixa)</strong>
               {ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}
             </span>
           </button>

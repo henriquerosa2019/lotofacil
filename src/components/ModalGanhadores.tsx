@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Trophy, MapPin, Users, DollarSign, Calendar, History, Trash2, ArrowLeft } from "lucide-react";
-import { ConcursoLotofacil, HistoricoConsultaConcurso } from "@/lib/types";
+import { X, Trophy, MapPin, Users, DollarSign, Calendar, History, Trash2, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
+import { ConcursoLotofacil, HistoricoConsultaConcurso, JogoRegistrado } from "@/lib/types";
 import { saveHistoricoConsulta, getHistoricoConsultas, deleteHistoricoConsulta } from "@/lib/storage";
 
 interface ModalGanhadoresProps {
@@ -10,6 +10,7 @@ interface ModalGanhadoresProps {
   isOpen: boolean;
   onClose: () => void;
   onSelecionarConcursoHistorico?: (c: ConcursoLotofacil) => void;
+  jogos?: JogoRegistrado[];
 }
 
 export default function ModalGanhadores({
@@ -17,6 +18,7 @@ export default function ModalGanhadores({
   isOpen,
   onClose,
   onSelecionarConcursoHistorico,
+  jogos = [],
 }: ModalGanhadoresProps) {
   const [activeTab, setActiveTab] = useState<"detalhes" | "historico">("detalhes");
   const [historicoSalvo, setHistoricoSalvo] = useState<HistoricoConsultaConcurso[]>([]);
@@ -41,6 +43,14 @@ export default function ModalGanhadores({
   const valor15 = faixa15?.valorPremio || 0;
 
   const cidades = concursoEmExibicao.listaMunicipioUFGanhadores || [];
+
+  // Jogos registrados que pertencem a este concurso específico
+  const jogosDesteConcurso = jogos.filter(
+    (j) => concursoEmExibicao.numero >= j.concursoInicial && concursoEmExibicao.numero <= j.concursoFinal
+  );
+
+  // Jogos futuros registrados
+  const jogosFuturos = jogos.filter((j) => j.concursoInicial > concursoEmExibicao.numero);
 
   const handleVerHistoricoItem = (item: HistoricoConsultaConcurso) => {
     const cData: ConcursoLotofacil = {
@@ -114,7 +124,7 @@ export default function ModalGanhadores({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-all cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -203,7 +213,117 @@ export default function ModalGanhadores({
           ) : (
             /* Visualização Detalhada do Concurso */
             <>
-              {/* Dezenas Sorteadas */}
+              {/* CRUZAMENTO OFICIAL CASO O CONCURSO SEJA O MESMO DO JOGO REGISTRADO */}
+              {jogosDesteConcurso.length > 0 ? (
+                <div className="p-4 rounded-xl bg-gradient-to-br from-emerald-950/50 via-[#121827] to-purple-950/40 border-2 border-emerald-500/60 shadow-xl space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-between border-b border-gray-800 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500 text-black uppercase tracking-wider">
+                        🎯 Conferência Oficial do Seu Jogo
+                      </span>
+                      <span className="text-xs text-gray-300">
+                        Concurso Oficial {concursoEmExibicao.numero}
+                      </span>
+                    </div>
+                  </div>
+
+                  {jogosDesteConcurso.map((jogo) => {
+                    const sortSet = new Set(concursoEmExibicao.dezenas);
+                    const acertadas = jogo.dezenas.filter((d) => sortSet.has(d));
+                    const acertos = acertadas.length;
+
+                    let valorGanho = 0;
+                    if (acertos === 15) {
+                      valorGanho = faixa15?.valorPremio || 2000000;
+                    } else if (acertos === 14) {
+                      const f14 = concursoEmExibicao.listaRateioPremio?.find((f) => f.faixa === 2);
+                      valorGanho = f14?.valorPremio || 1500;
+                    } else if (acertos === 13) valorGanho = 35;
+                    else if (acertos === 12) valorGanho = 14;
+                    else if (acertos === 11) valorGanho = 7;
+
+                    const isPremiado = acertos >= 11;
+
+                    return (
+                      <div
+                        key={jogo.id}
+                        className="p-3.5 rounded-xl bg-black/50 border border-emerald-500/30 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-[11px] text-purple-300 font-bold block">
+                              Seu Bilhete Cadastrado:
+                            </span>
+                            <strong className="text-sm text-white">{jogo.grupoNome}</strong>
+                          </div>
+
+                          <div className="text-right">
+                            <span
+                              className={`px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold ${
+                                isPremiado
+                                  ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/30"
+                                  : "bg-gray-800 text-gray-400"
+                              }`}
+                            >
+                              {acertos} ACERTOS {isPremiado ? "• PREMIADO! 🏆" : ""}
+                            </span>
+                          </div>
+                        </div>
+
+                        {isPremiado && (
+                          <div className="flex items-center justify-between text-xs bg-emerald-950/40 p-2 rounded-lg border border-emerald-500/40">
+                            <span className="text-gray-300">Premiação na Caixa Econômica:</span>
+                            <strong className="text-emerald-300 font-mono text-sm font-bold">
+                              {valorGanho.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                            </strong>
+                          </div>
+                        )}
+
+                        {/* Dezenas acertadas no bilhete */}
+                        <div className="space-y-1">
+                          <span className="text-[11px] text-gray-400 block">
+                            Suas 15 dezenas (acertos em verde esmeralda):
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {jogo.dezenas.map((d) => {
+                              const acertou = sortSet.has(d);
+                              return (
+                                <span
+                                  key={d}
+                                  className={`w-7 h-7 rounded-lg text-xs font-mono font-bold flex items-center justify-center ${
+                                    acertou
+                                      ? "bg-emerald-600 text-white border-2 border-emerald-400 shadow-lg shadow-emerald-600/50 scale-105"
+                                      : "bg-gray-800/70 text-gray-500 border border-gray-700/50"
+                                  }`}
+                                >
+                                  {d.toString().padStart(2, "0")}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Se não houver jogo registrado para este concurso */
+                <div className="p-3.5 rounded-xl bg-gray-900/60 border border-gray-800 text-xs text-gray-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-purple-400 shrink-0" />
+                    <span>
+                      Você não possui jogos registrados para o <strong>Concurso {concursoEmExibicao.numero}</strong>.
+                      {jogosFuturos.length > 0 && (
+                        <span className="text-purple-300 ml-1 block sm:inline mt-1 sm:mt-0">
+                          (Seu próximo jogo registrado é o <strong>{jogosFuturos[0].grupoNome}</strong> para o <strong>Concurso {jogosFuturos[0].concursoInicial}</strong>).
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Dezenas Sorteadas no Concurso Oficial */}
               <div>
                 <span className="text-xs text-gray-400 block mb-2 font-medium">
                   15 Dezenas Sorteadas no Concurso {concursoEmExibicao.numero}:

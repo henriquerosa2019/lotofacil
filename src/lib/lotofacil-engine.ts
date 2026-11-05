@@ -1,4 +1,4 @@
-import { ConcursoLotofacil, EstatisticasAnalise, GrupoDezenas } from "./types";
+import { ConcursoLotofacil, EstatisticasAnalise, GrupoDezenas, JogoRegistrado } from "./types";
 
 export const PRIMES = new Set([2, 3, 5, 7, 11, 13, 17, 19, 23]);
 export const MOLDURA = new Set([1, 2, 3, 4, 5, 6, 10, 11, 15, 16, 20, 21, 22, 23, 24, 25]);
@@ -7,9 +7,9 @@ export const CENTRO = new Set([7, 8, 9, 12, 13, 14, 17, 18, 19]);
 export const VALOR_APOSTA_15 = 3.50; // R$ 3,50 preço por aposta simples
 
 export const PREMIOS_FIXOS: { [acertos: number]: number } = {
-  11: 6.00,  // R$ 6,00
-  12: 12.00, // R$ 12,00
-  13: 30.00, // R$ 30,00
+  11: 7.00,  // R$ 7,00 (com aposta a R$ 3,50)
+  12: 14.00, // R$ 14,00
+  13: 35.00, // R$ 35,00
 };
 
 export function calcularCustoTeimosinha(jogosCount: number, teimosinhaConcursos: number): {
@@ -455,3 +455,95 @@ export function gerarMelhoresQuinzenas(
   ];
 }
 
+
+
+/**
+ * Apura um jogo registrado contra um concurso oficial da Caixa.
+ * Cruza as dezenas e atualiza a premiação de acordo com a regra oficial.
+ */
+export function apurarJogoComConcurso(
+  jogo: JogoRegistrado,
+  concurso: ConcursoLotofacil
+): {
+  jogoAtualizado: JogoRegistrado;
+  pertenceAoConcurso: boolean;
+  acertos: number;
+  dezenasAcertadas: number[];
+  faixaPremio: string;
+  valorGanho: number;
+} {
+  // Verifica se o concurso oficial pertence à vigência do jogo (concursoInicial <= numero <= concursoFinal)
+  if (concurso.numero < jogo.concursoInicial || concurso.numero > jogo.concursoFinal) {
+    return {
+      jogoAtualizado: jogo,
+      pertenceAoConcurso: false,
+      acertos: 0,
+      dezenasAcertadas: [],
+      faixaPremio: "Fora da vigência do concurso",
+      valorGanho: 0,
+    };
+  }
+
+  const sortSet = new Set(concurso.dezenas);
+  const acertadas = jogo.dezenas.filter((d) => sortSet.has(d));
+  const acertos = acertadas.length;
+
+  let valorGanho = 0;
+  let faixaPremio = "Não premiado";
+
+  if (acertos >= 11) {
+    if (acertos === 15) {
+      const f = concurso.listaRateioPremio?.find((r) => r.faixa === 1);
+      valorGanho = f?.valorPremio || 2000000.0;
+      faixaPremio = "15 ACERTOS (PRÊMIO MÁXIMO!)";
+    } else if (acertos === 14) {
+      const f = concurso.listaRateioPremio?.find((r) => r.faixa === 2);
+      valorGanho = f?.valorPremio || 1500.0;
+      faixaPremio = "14 Acertos";
+    } else if (acertos === 13) {
+      valorGanho = PREMIOS_FIXOS[13] || 35.0;
+      faixaPremio = "13 Acertos";
+    } else if (acertos === 12) {
+      valorGanho = PREMIOS_FIXOS[12] || 14.0;
+      faixaPremio = "12 Acertos";
+    } else if (acertos === 11) {
+      valorGanho = PREMIOS_FIXOS[11] || 7.0;
+      faixaPremio = "11 Acertos";
+    }
+  }
+
+  const apuracaoAtualizada = {
+    ...jogo.apuracoes,
+    [concurso.numero]: {
+      concurso: concurso.numero,
+      data: concurso.dataApuracao,
+      dezenasSorteadas: concurso.dezenas,
+      acertos,
+      dezenasAcertadas: acertadas,
+      faixaPremio,
+      valorGanho,
+      apuradoEm: new Date().toLocaleTimeString("pt-BR"),
+    },
+  };
+
+  const totalGanho = Object.values(apuracaoAtualizada).reduce(
+    (acc, cur) => acc + cur.valorGanho,
+    0
+  );
+
+  const jogoAtualizado: JogoRegistrado = {
+    ...jogo,
+    apuracoes: apuracaoAtualizada,
+    totalGanho,
+    status: concurso.numero >= jogo.concursoFinal ? "concluido" : "ativo",
+  };
+
+  return {
+    jogoAtualizado,
+    pertenceAoConcurso: true,
+    acertos,
+    dezenasAcertadas: acertadas,
+    faixaPremio,
+    valorGanho,
+  };
+}

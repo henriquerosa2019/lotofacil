@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { JogoRegistrado, ConcursoLotofacil, GrupoDezenas } from "@/lib/types";
-import { PREMIOS_FIXOS, GRUPOS_PADRAO, VALOR_APOSTA_15 } from "@/lib/lotofacil-engine";
-import { saveJogoRegistrado, deleteJogoRegistrado } from "@/lib/storage";
+import { PREMIOS_FIXOS, GRUPOS_PADRAO, VALOR_APOSTA_15, apurarJogoComConcurso } from "@/lib/lotofacil-engine";
+import { saveJogoRegistrado, deleteJogoRegistrado, undoUltimoJogo } from "@/lib/storage";
 import VolanteGrid from "./VolanteGrid";
 import {
   CheckCircle2,
@@ -14,9 +14,13 @@ import {
   AlertCircle,
   Eye,
   Undo2,
-  Zap,
   RotateCcw,
   Check,
+  Clock,
+  ArrowRight,
+  Plus,
+  Minus,
+  Search,
 } from "lucide-react";
 
 interface AbaAfericaoProps {
@@ -26,18 +30,7 @@ interface AbaAfericaoProps {
   onIrParaGerador: () => void;
   ultimoConcurso: ConcursoLotofacil | null;
   gruposDisponiveis?: GrupoDezenas[];
-}
-
-interface CruzamentoRecente {
-  jogoId: string;
-  grupoNome: string;
-  concurso: number;
-  dataApuracao: string;
-  acertos: number;
-  dezenasSorteadas: number[];
-  dezenasAcertadas: number[];
-  faixaPremio: string;
-  valorGanho: number;
+  onVerResultado?: () => void;
 }
 
 export default function AbaAfericao({
@@ -47,19 +40,30 @@ export default function AbaAfericao({
   onIrParaGerador,
   ultimoConcurso,
   gruposDisponiveis = GRUPOS_PADRAO,
+  onVerResultado,
 }: AbaAfericaoProps) {
   const [aferindoId, setAferindoId] = useState<string | null>(null);
-  const [mensagem, setMensagem] = useState<string | null>(null);
+  const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "info" | "erro"; texto: string } | null>(null);
+  const [ultimoJogoSalvoId, setUltimoJogoSalvoId] = useState<string | null>(null);
 
-  // Estados para Registro Direto & Cruzamento Instantâneo
+  // Estados para Escolha do Jogo
   const [opcaoSelecionada, setOpcaoSelecionada] = useState<string>("grupo-1");
   const [minhasDezenas, setMinhasDezenas] = useState<number[]>([]);
   const [teimosinhaQtd, setTeimosinhaQtd] = useState<number>(1);
-  const [processandoCruzamento, setProcessandoCruzamento] = useState<boolean>(false);
-  const [cruzamentoRecente, setCruzamentoRecente] = useState<CruzamentoRecente | null>(null);
 
-  const concursoAtual = ultimoConcurso?.numero || 3760;
-  const proximoConcurso = concursoAtual + 1;
+  // Concurso sugerido pela IA (último concurso oficial + 1)
+  const concursoUltimoNumero = ultimoConcurso?.numero || 3760;
+  const concursoSugerido = concursoUltimoNumero + 1;
+  const [concursoJogo, setConcursoJogo] = useState<number>(concursoSugerido);
+
+  // Atualiza concurso sugerido se o último concurso carregar
+  useEffect(() => {
+    if (ultimoConcurso?.numero) {
+      setConcursoJogo(ultimoConcurso.numero + 1);
+    }
+  }, [ultimoConcurso?.numero]);
+
+  const concursoFinalCalculado = concursoJogo + teimosinhaQtd - 1;
 
   // Identifica dezenas ativas conforme a seleção
   const obterDezenasDaOpcao = (): { nome: string; dezenas: number[] } => {
@@ -79,7 +83,7 @@ export default function AbaAfericao({
         return prev.filter((d) => d !== num);
       }
       if (prev.length >= 15) {
-        setMensagem("Você já selecionou o limite de 15 dezenas.");
+        setMensagem({ tipo: "erro", texto: "Você já selecionou o limite de 15 dezenas." });
         setTimeout(() => setMensagem(null), 3000);
         return prev;
       }
@@ -93,124 +97,92 @@ export default function AbaAfericao({
     setMinhasDezenas(embaralhado.slice(0, 15).sort((a, b) => a - b));
   };
 
-  // Registrar e Cruzar com o Resultado da Caixa
-  const handleRegistrarECruzar = async () => {
+  // 1. SALVAR E REGISTRAR O JOGO (Sem cruzar antecipadamente com sorteios futuros)
+  const handleSalvarERegistrarJogo = () => {
     const dezenasParaApostar = dezenasAtuais;
     if (dezenasParaApostar.length !== 15) {
-      setMensagem("Selecione exatamente 15 dezenas para registrar a aposta.");
+      setMensagem({ tipo: "erro", texto: "Selecione exatamente 15 dezenas para registrar a aposta." });
       setTimeout(() => setMensagem(null), 4000);
       return;
     }
 
-    setProcessandoCruzamento(true);
-    setMensagem("Registrando bilhete e cruzando com o resultado oficial da Caixa...");
-
-    try {
-      let concOficial = ultimoConcurso;
-      if (!concOficial) {
-        const res = await fetch("/api/lotofacil");
-        const json = await res.json();
-        if (json.sucesso && json.concurso) {
-          concOficial = json.concurso;
-        }
-      }
-
-      const custo = teimosinhaQtd * VALOR_APOSTA_15;
-      const concInicialJogo = concOficial ? concOficial.numero : proximoConcurso;
-      const novoJogo: JogoRegistrado = {
-        id: `jogo_${Date.now()}_${opcaoSelecionada}`,
-        grupoId: opcaoSelecionada,
-        grupoNome: nomeAtual,
-        dezenas: dezenasParaApostar,
-        concursoInicial: concInicialJogo,
-        teimosinhaConcursos: teimosinhaQtd,
-        concursoFinal: concInicialJogo + teimosinhaQtd - 1,
-        dataAposta: new Date().toLocaleDateString("pt-BR"),
-        custoTotal: custo,
-        status: "ativo",
-        apuracoes: {},
-        totalGanho: 0,
-      };
-
-      if (concOficial) {
-        const sortSet = new Set(concOficial.dezenas);
-        const acertadas = dezenasParaApostar.filter((d) => sortSet.has(d));
-        const acertos = acertadas.length;
-
-        let valorGanho = 0;
-        let faixaPremio = "Não premiado";
-
-        if (acertos === 15) {
-          const f = concOficial.listaRateioPremio?.find((r) => r.faixa === 1);
-          valorGanho = f?.valorPremio || 2000000.0;
-          faixaPremio = "15 ACERTOS (PRÊMIO MÁXIMO!)";
-        } else if (acertos === 14) {
-          const f = concOficial.listaRateioPremio?.find((r) => r.faixa === 2);
-          valorGanho = f?.valorPremio || 1500.0;
-          faixaPremio = "14 Acertos";
-        } else if (acertos === 13) {
-          valorGanho = PREMIOS_FIXOS[13];
-          faixaPremio = "13 Acertos";
-        } else if (acertos === 12) {
-          valorGanho = PREMIOS_FIXOS[12];
-          faixaPremio = "12 Acertos";
-        } else if (acertos === 11) {
-          valorGanho = PREMIOS_FIXOS[11];
-          faixaPremio = "11 Acertos";
-        }
-
-        novoJogo.apuracoes[concOficial.numero] = {
-          concurso: concOficial.numero,
-          data: concOficial.dataApuracao,
-          dezenasSorteadas: concOficial.dezenas,
-          acertos,
-          dezenasAcertadas: acertadas,
-          faixaPremio,
-          valorGanho,
-          apuradoEm: new Date().toLocaleTimeString("pt-BR"),
-        };
-
-        novoJogo.totalGanho = valorGanho;
-
-        setCruzamentoRecente({
-          jogoId: novoJogo.id,
-          grupoNome: novoJogo.grupoNome,
-          concurso: concOficial.numero,
-          dataApuracao: concOficial.dataApuracao,
-          acertos,
-          dezenasSorteadas: concOficial.dezenas,
-          dezenasAcertadas: acertadas,
-          faixaPremio,
-          valorGanho,
-        });
-      }
-
-      saveJogoRegistrado(novoJogo);
-      onAtualizarJogos();
-      setMensagem("Jogo registrado e conferido com sucesso com a Caixa!");
-    } catch (err: any) {
-      setMensagem(`Erro ao conferir: ${err?.message || "Tente novamente"}`);
-    } finally {
-      setProcessandoCruzamento(false);
-      setTimeout(() => setMensagem(null), 5000);
+    if (!concursoJogo || concursoJogo <= 0) {
+      setMensagem({ tipo: "erro", texto: "Informe um número de concurso válido." });
+      setTimeout(() => setMensagem(null), 4000);
+      return;
     }
+
+    const custo = teimosinhaQtd * VALOR_APOSTA_15;
+    const novoJogo: JogoRegistrado = {
+      id: `jogo_${Date.now()}_${opcaoSelecionada}`,
+      grupoId: opcaoSelecionada,
+      grupoNome: nomeAtual,
+      dezenas: dezenasParaApostar,
+      concursoInicial: concursoJogo,
+      teimosinhaConcursos: teimosinhaQtd,
+      concursoFinal: concursoFinalCalculado,
+      dataAposta: new Date().toLocaleDateString("pt-BR"),
+      custoTotal: custo,
+      status: "ativo",
+      apuracoes: {},
+      totalGanho: 0,
+    };
+
+    saveJogoRegistrado(novoJogo);
+    setUltimoJogoSalvoId(novoJogo.id);
+    onAtualizarJogos();
+
+    const vigenciaTexto =
+      teimosinhaQtd > 1
+        ? `Concursos ${novoJogo.concursoInicial} até ${novoJogo.concursoFinal} (${teimosinhaQtd} sorteios)`
+        : `Concurso ${novoJogo.concursoInicial}`;
+
+    setMensagem({
+      tipo: "sucesso",
+      texto: `Jogo "${nomeAtual}" salvo e registrado com sucesso para o ${vigenciaTexto}! Clique em "Ver Resultado" quando a Caixa apurar este concurso para conferir seus acertos.`,
+    });
   };
 
-  // Aferição manual de um jogo já existente
-  const handleAferirJogo = async (jogo: JogoRegistrado) => {
+  // Desfazer o último jogo registrado
+  const handleDesfazerJogo = (idParaRemover?: string) => {
+    const id = idParaRemover || ultimoJogoSalvoId;
+    if (id) {
+      deleteJogoRegistrado(id);
+    } else {
+      undoUltimoJogo();
+    }
+    onAtualizarJogos();
+    setUltimoJogoSalvoId(null);
+    setMensagem({ tipo: "info", texto: "Jogo desfeito e removido do monitoramento com sucesso!" });
+    setTimeout(() => setMensagem(null), 4000);
+  };
+
+  // 2. CONFERIR JOGO ESPECÍFICO COM A CAIXA
+  const handleAferirJogoIndividual = async (jogo: JogoRegistrado) => {
     setAferindoId(jogo.id);
-    setMensagem(`Consultando resultados da Caixa para o ${jogo.grupoNome}...`);
+    setMensagem({ tipo: "info", texto: `Consultando Caixa para conferir o jogo "${jogo.grupoNome}"...` });
 
     try {
       const resLatest = await fetch("/api/lotofacil");
       const dataLatest = await resLatest.json();
       if (!dataLatest.sucesso || !dataLatest.concurso) {
-        throw new Error("Não foi possível obter dados oficiais da Caixa.");
+        throw new Error("Não foi possível conectar à API da Caixa Econômica Federal.");
       }
 
       const ultimoOficial = dataLatest.concurso as ConcursoLotofacil;
+
+      // Se o último concurso sorteado na Caixa ainda for anterior ao concurso do jogo
+      if (ultimoOficial.numero < jogo.concursoInicial) {
+        setMensagem({
+          tipo: "info",
+          texto: `O último concurso apurado pela Caixa é o C.${ultimoOficial.numero}. O seu jogo pertence ao C.${jogo.concursoInicial} e será conferido assim que a Caixa realizar a apuração deste concurso!`,
+        });
+        return;
+      }
+
+      let jogoAtualizado = { ...jogo };
+      let houveAlgumaApuracao = false;
       const concFinalParaChecar = Math.min(jogo.concursoFinal, ultimoOficial.numero);
-      const jogoAtualizado = { ...jogo, apuracoes: { ...jogo.apuracoes } };
 
       for (let c = jogo.concursoInicial; c <= concFinalParaChecar; c++) {
         let concData: ConcursoLotofacil | null = null;
@@ -225,111 +197,72 @@ export default function AbaAfericao({
         }
 
         if (concData) {
-          const dezenasSorteadas = concData.dezenas;
-          const sortSet = new Set(dezenasSorteadas);
-          const acertadas = jogo.dezenas.filter((d) => sortSet.has(d));
-          const acertos = acertadas.length;
-
-          let valorGanho = 0;
-          let faixaPremio = "Não premiado";
-
-          if (acertos >= 11) {
-            if (acertos === 15) {
-              const f = concData.listaRateioPremio?.find((r) => r.faixa === 1);
-              valorGanho = f?.valorPremio || 2000000.0;
-              faixaPremio = "15 ACERTOS (PRÊMIO MÁXIMO!)";
-            } else if (acertos === 14) {
-              const f = concData.listaRateioPremio?.find((r) => r.faixa === 2);
-              valorGanho = f?.valorPremio || 1500.0;
-              faixaPremio = "14 Acertos";
-            } else if (acertos === 13) {
-              valorGanho = PREMIOS_FIXOS[13];
-              faixaPremio = "13 Acertos";
-            } else if (acertos === 12) {
-              valorGanho = PREMIOS_FIXOS[12];
-              faixaPremio = "12 Acertos";
-            } else if (acertos === 11) {
-              valorGanho = PREMIOS_FIXOS[11];
-              faixaPremio = "11 Acertos";
-            }
-          }
-
-          jogoAtualizado.apuracoes[c] = {
-            concurso: c,
-            data: concData.dataApuracao,
-            dezenasSorteadas,
-            acertos,
-            dezenasAcertadas: acertadas,
-            faixaPremio,
-            valorGanho,
-            apuradoEm: new Date().toLocaleTimeString("pt-BR"),
-          };
+          const resApuracao = apurarJogoComConcurso(jogoAtualizado, concData);
+          jogoAtualizado = resApuracao.jogoAtualizado;
+          houveAlgumaApuracao = true;
         }
       }
 
-      jogoAtualizado.totalGanho = Object.values(jogoAtualizado.apuracoes).reduce(
-        (acc, cur) => acc + cur.valorGanho,
-        0
-      );
-
       saveJogoRegistrado(jogoAtualizado);
       onAtualizarJogos();
-      setMensagem(`Aferição concluída! Total apurado: R$ ${jogoAtualizado.totalGanho.toFixed(2)}`);
+
+      if (houveAlgumaApuracao) {
+        setMensagem({
+          tipo: "sucesso",
+          texto: `Conferência realizada! Total ganho apurado: R$ ${jogoAtualizado.totalGanho.toFixed(2)}.`,
+        });
+      }
     } catch (err: any) {
-      setMensagem(`Erro na aferição: ${err?.message || "Tente novamente mais tarde"}`);
+      setMensagem({ tipo: "erro", texto: `Erro na conferência: ${err?.message || "Tente novamente mais tarde"}` });
     } finally {
       setAferindoId(null);
-      setTimeout(() => setMensagem(null), 5000);
     }
-  };
-
-  const handleExcluirJogo = (id: string) => {
-    deleteJogoRegistrado(id);
-    if (cruzamentoRecente?.jogoId === id) {
-      setCruzamentoRecente(null);
-    }
-    onAtualizarJogos();
-    setMensagem("Jogo removido do monitoramento.");
-    setTimeout(() => setMensagem(null), 3000);
   };
 
   return (
     <div className="space-y-6">
-      {/* 1. SEÇÃO DE REGISTRO & CRUZAMENTO INSTANTÂNEO COM A CAIXA */}
+      {/* 1. SEÇÃO DE REGISTRO DE JOGO & VINCULAÇÃO AO CONCURSO */}
       <div className="p-5 md:p-6 rounded-2xl bg-gradient-to-r from-[#121827] via-[#141b2e] to-[#121827] border border-purple-500/40 shadow-xl shadow-purple-950/20 space-y-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-800 pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white uppercase tracking-wider">
-                Aferição em Tempo Real
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-600 text-white uppercase tracking-wider">
+                Registro de Jogos
               </span>
-              <span className="text-xs text-purple-300 font-semibold flex items-center gap-1">
-                <Zap className="w-3.5 h-3.5 text-amber-400" /> Cruzamento Imediato de Acertos
+              <span className="text-xs text-amber-300 font-semibold flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> Vinculação por Concurso Oficial
               </span>
             </div>
             <h2 className="text-base md:text-lg font-bold text-white mt-1 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-400" />
-              Escolha uma Opção de Grupo ou Digite Suas Dezenas para Conferência
+              Escolha uma Opção de Grupo e Registre seu Jogo
             </h2>
             <p className="text-xs text-gray-400 mt-0.5">
-              Escolha um dos Grupos de Elite da IA ou marque suas 15 dezenas e cruze instantaneamente com o resultado oficial da Caixa.
+              O bilhete é registrado com o número do concurso que você vai disputar. A conferência é feita quando você clica em <strong>Ver Resultado</strong>.
             </p>
           </div>
 
-          {ultimoConcurso && (
-            <div className="flex items-center gap-2 text-xs bg-purple-950/50 border border-purple-500/30 px-3.5 py-2 rounded-xl text-purple-200">
-              <Calendar className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          {/* Botão em Destaque para Ver Resultado em Tempo Real */}
+          {onVerResultado && (
+            <button
+              type="button"
+              onClick={onVerResultado}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-700 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold text-xs shadow-lg shadow-purple-900/40 transition-all cursor-pointer group active:scale-95 shrink-0"
+              title="Busca o resultado oficial da Caixa em tempo real e confere os jogos do concurso correspondente"
+            >
+              <Search className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform" />
               <span>
-                Último Concurso: <strong>C.{ultimoConcurso.numero}</strong> ({ultimoConcurso.dataApuracao})
+                Ver Resultado Caixa
+                {ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}
               </span>
-            </div>
+            </button>
           )}
         </div>
 
         {/* Escolha da Fonte do Jogo */}
         <div className="space-y-2">
           <label className="text-xs font-semibold text-gray-300 block">
-            1. Selecione o Grupo ou Marque Suas Dezenas:
+            1. Selecione o Grupo da IA ou Marque Suas Dezenas:
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {gruposDisponiveis.map((g, idx) => {
@@ -425,158 +358,169 @@ export default function AbaAfericao({
           )}
         </div>
 
-        {/* Controles de Teimosinha & Botão de Cruzamento */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-gray-400">Ciclo da Aposta:</span>
+        {/* 2. DEFINIÇÃO DO CONCURSO DO JOGO & TEIMOSINHA */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-gray-900/60 border border-gray-800">
+          {/* Seletor do Número do Concurso */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <label className="font-semibold text-gray-300 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                Número do Concurso da Aposta:
+              </label>
+              <span className="text-[11px] text-gray-400">
+                Último apurado: <strong className="text-purple-300">C.{concursoUltimoNumero}</strong>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setConcursoJogo((prev) => Math.max(1, prev - 1))}
+                className="w-9 h-9 rounded-lg bg-gray-800 hover:bg-gray-700 text-white font-bold flex items-center justify-center cursor-pointer"
+                title="Concurso anterior"
+              >
+                <Minus className="w-3.5 h-3.5" />
+              </button>
+
+              <input
+                type="number"
+                value={concursoJogo}
+                onChange={(e) => setConcursoJogo(parseInt(e.target.value, 10) || concursoSugerido)}
+                className="flex-1 text-center bg-black/60 border border-purple-500/50 rounded-lg py-2 px-3 text-purple-200 font-bold font-mono text-base outline-none focus:border-purple-400"
+              />
+
+              <button
+                type="button"
+                onClick={() => setConcursoJogo((prev) => prev + 1)}
+                className="w-9 h-9 rounded-lg bg-gray-800 hover:bg-gray-700 text-white font-bold flex items-center justify-center cursor-pointer"
+                title="Próximo concurso"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setConcursoJogo(concursoSugerido)}
+                className="px-2.5 py-2 rounded-lg bg-purple-950/60 hover:bg-purple-900 border border-purple-500/30 text-purple-300 text-xs font-semibold cursor-pointer whitespace-nowrap"
+                title="Resetar para o próximo concurso oficial sugerido"
+              >
+                Sugerido ({concursoSugerido})
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400">
+              A IA analisa o último concurso (<strong>C.{concursoUltimoNumero}</strong>) e sugere o <strong>C.{concursoSugerido}</strong>, ou você pode alterar livremente.
+            </p>
+          </div>
+
+          {/* Ciclo da Teimosinha */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <label className="font-semibold text-gray-300">
+                Ciclo da Teimosinha (Repetição):
+              </label>
+              <span className="text-emerald-400 font-mono font-bold text-xs">
+                {(teimosinhaQtd * VALOR_APOSTA_15).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+              </span>
+            </div>
+
             <select
               value={teimosinhaQtd}
               onChange={(e) => setTeimosinhaQtd(parseInt(e.target.value, 10))}
-              className="bg-black/60 text-purple-300 font-bold border border-purple-500/40 rounded-lg px-2.5 py-1.5 outline-none cursor-pointer text-xs"
+              className="w-full bg-black/60 text-purple-300 font-bold border border-purple-500/40 rounded-lg px-3 py-2 outline-none cursor-pointer text-xs"
             >
-              <option value={1}>1 Concurso (R$ 3,50)</option>
-              <option value={3}>3 Concursos (R$ 10,50)</option>
-              <option value={6}>6 Concursos (R$ 21,00)</option>
-              <option value={12}>12 Concursos (R$ 42,00)</option>
-              <option value={18}>18 Concursos (R$ 63,00)</option>
-              <option value={24}>24 Concursos (R$ 84,00)</option>
+              <option value={1}>1 Concurso — R$ 3,50</option>
+              <option value={3}>3 Concursos — R$ 10,50</option>
+              <option value={6}>6 Concursos (1 semana) — R$ 21,00</option>
+              <option value={12}>12 Concursos (2 semanas) — R$ 42,00</option>
+              <option value={18}>18 Concursos (3 semanas) — R$ 63,00</option>
+              <option value={24}>24 Concursos (1 mês) — R$ 84,00</option>
             </select>
-            <span className="text-gray-500 font-mono">
-              Total: {(teimosinhaQtd * VALOR_APOSTA_15).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
-            </span>
+
+            <p className="text-[11px] text-gray-400">
+              Vigência da Aposta:{" "}
+              <strong className="text-white">
+                {teimosinhaQtd > 1
+                  ? `Concurso ${concursoJogo} até Concurso ${concursoFinalCalculado}`
+                  : `Concurso ${concursoJogo}`}
+              </strong>
+            </p>
+          </div>
+        </div>
+
+        {/* Botão de Registro do Jogo */}
+        <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="text-xs text-gray-400">
+            Aposta simples: <strong className="text-white">R$ 3,50 por concurso</strong> • Total:{" "}
+            <strong className="text-emerald-400 font-mono">
+              {(teimosinhaQtd * VALOR_APOSTA_15).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+            </strong>
           </div>
 
           <button
             type="button"
-            disabled={processandoCruzamento || dezenasAtuais.length !== 15}
-            onClick={handleRegistrarECruzar}
-            className="py-3 px-5 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 text-white font-bold text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/30 transition-all cursor-pointer active:scale-98"
+            disabled={dezenasAtuais.length !== 15}
+            onClick={handleSalvarERegistrarJogo}
+            className="py-3 px-6 rounded-xl bg-gradient-to-r from-purple-600 via-fuchsia-600 to-purple-600 hover:from-purple-500 hover:to-fuchsia-500 disabled:opacity-50 text-white font-bold text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-900/30 transition-all cursor-pointer active:scale-98"
           >
-            <Zap className={`w-4 h-4 fill-current ${processandoCruzamento ? "animate-spin" : ""}`} />
-            <span>{processandoCruzamento ? "Conferindo..." : "Registrar e Cruzar com o Resultado da Caixa"}</span>
+            <Check className="w-4 h-4" />
+            <span>Salvar e Registrar Jogo para o Concurso {concursoJogo}</span>
           </button>
         </div>
       </div>
 
-      {/* 2. PAINEL DE RESULTADO DO CRUZAMENTO INSTANTÂNEO */}
-      {cruzamentoRecente && (
-        <div className="p-5 md:p-6 rounded-2xl bg-gradient-to-br from-emerald-950/40 via-[#121827] to-purple-950/30 border-2 border-emerald-500/60 shadow-2xl shadow-emerald-950/30 space-y-4 animate-in fade-in">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-500 text-black uppercase tracking-wider">
-                  Resultado da Conferência Oficial
-                </span>
-                <span className="text-xs text-gray-400">
-                  Concurso Oficial {cruzamentoRecente.concurso} ({cruzamentoRecente.dataApuracao})
-                </span>
-              </div>
-              <h3 className="text-lg font-bold text-white mt-1">
-                {cruzamentoRecente.grupoNome}
-              </h3>
-            </div>
-
-            <div className="text-right">
-              <span className="text-xs text-gray-400 block">Acertos Registrados:</span>
-              <div className="text-2xl md:text-3xl font-extrabold text-emerald-400 font-mono">
-                {cruzamentoRecente.acertos} ACERTOS
-              </div>
-            </div>
+      {/* Notificação de Feedback */}
+      {mensagem && (
+        <div
+          className={`p-4 rounded-xl border text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in ${
+            mensagem.tipo === "sucesso"
+              ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-200"
+              : mensagem.tipo === "erro"
+              ? "bg-rose-950/40 border-rose-500/40 text-rose-200"
+              : "bg-purple-950/40 border-purple-500/40 text-purple-200"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <span>{mensagem.texto}</span>
           </div>
 
-          {/* Destaque do Prêmio e Status */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800">
-              <span className="text-xs text-gray-400 block">Faixa de Premiação:</span>
-              <strong className="text-sm text-white mt-0.5 block">
-                {cruzamentoRecente.faixaPremio}
-              </strong>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800">
-              <span className="text-xs text-gray-400 block">Valor Ganho na Caixa:</span>
-              <strong className="text-base text-emerald-400 font-mono font-bold mt-0.5 block">
-                {cruzamentoRecente.valorGanho.toLocaleString("pt-BR", {
-                  style: "currency",
-                  currency: "BRL",
-                })}
-              </strong>
-            </div>
-
-            <div className="p-3.5 rounded-xl bg-gray-900/80 border border-gray-800 flex items-center justify-between">
-              <div>
-                <span className="text-xs text-gray-400 block">Status:</span>
-                <strong className={`text-xs mt-0.5 block ${cruzamentoRecente.acertos >= 11 ? "text-emerald-400" : "text-gray-400"}`}>
-                  {cruzamentoRecente.acertos >= 11 ? "BILHETE PREMIADO!" : "Sem premiação neste concurso"}
-                </strong>
-              </div>
+          {ultimoJogoSalvoId && (
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
               <button
                 type="button"
-                onClick={() => handleExcluirJogo(cruzamentoRecente.jogoId)}
-                className="px-2.5 py-1.5 rounded-lg bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-500/40 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
-                title="Desfazer e cancelar este jogo"
+                onClick={() => handleDesfazerJogo(ultimoJogoSalvoId)}
+                className="px-3 py-1.5 rounded-lg bg-rose-600/30 hover:bg-rose-600 border border-rose-500/50 text-rose-200 hover:text-white font-semibold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Undo2 className="w-3.5 h-3.5" />
                 Desfazer Jogo
               </button>
             </div>
-          </div>
-
-          {/* Volante Visual de Dezenas Acertadas */}
-          <div className="space-y-2 pt-2">
-            <span className="text-xs text-gray-400 font-medium block">
-              Dezenas Sorteadas vs. Acertadas (acertos em verde esmeralda):
-            </span>
-            <div className="flex flex-wrap gap-1.5">
-              {cruzamentoRecente.dezenasSorteadas.map((num) => {
-                const acertou = cruzamentoRecente.dezenasAcertadas.includes(num);
-                return (
-                  <span
-                    key={num}
-                    className={`w-9 h-9 rounded-xl text-xs font-mono flex items-center justify-center font-bold ${
-                      acertou
-                        ? "bg-emerald-600 text-white border-2 border-emerald-400 shadow-lg shadow-emerald-600/40 scale-105"
-                        : "bg-gray-800/60 text-gray-500 border border-gray-700/50"
-                    }`}
-                  >
-                    {num.toString().padStart(2, "0")}
-                  </span>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </div>
       )}
 
-      {mensagem && (
-        <div className="p-3.5 rounded-xl bg-purple-950/40 border border-purple-500/40 text-purple-200 text-xs flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-purple-400 shrink-0" />
-          <span>{mensagem}</span>
-        </div>
-      )}
-
-      {/* 3. HISTÓRICO DE JOGOS REGISTRADOS & AFERIÇÕES ANTERIORES */}
+      {/* 2. HISTÓRICO DE JOGOS REGISTRADOS & CONFERÊNCIA POR CONCURSO */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-bold text-white flex items-center gap-2">
             <RotateCcw className="w-4 h-4 text-purple-400" />
-            Histórico de Jogos Registrados ({jogos.length})
+            Meus Jogos Registrados ({jogos.length})
           </h3>
           <span className="text-xs text-gray-400">
-            Acompanhe o saldo consolidado e as apurações de cada aposta
+            Acompanhe o status e a conferência de cada aposta
           </span>
         </div>
 
         {jogos.length === 0 ? (
           <div className="p-8 text-center rounded-2xl bg-[#121827] border border-dashed border-gray-800 space-y-2">
             <AlertCircle className="w-8 h-8 text-gray-600 mx-auto" />
-            <h4 className="text-sm font-semibold text-gray-300">Nenhum jogo salvo no histórico</h4>
+            <h4 className="text-sm font-semibold text-gray-300">Nenhum jogo registrado ainda</h4>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              Utilize o painel acima para registrar um grupo da IA ou suas dezenas e conferir na hora com a Caixa.
+              Selecione uma opção de grupo ou suas dezenas acima, defina o concurso e clique em <strong>Salvar e Registrar Jogo</strong>.
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-5">
             {jogos.map((jogo) => {
               const apuracoesArray = Object.values(jogo.apuracoes).sort(
                 (a, b) => b.concurso - a.concurso
@@ -584,26 +528,51 @@ export default function AbaAfericao({
               const saldoJogo = jogo.totalGanho - jogo.custoTotal;
               const isAferindo = aferindoId === jogo.id;
 
+              // Verifica se o jogo está aguardando sorteio
+              const ultimoNumeroOficial = ultimoConcurso?.numero || 3760;
+              const aguardandoSorteio = ultimoNumeroOficial < jogo.concursoInicial;
+
               return (
                 <div
                   key={jogo.id}
-                  className="p-5 rounded-2xl bg-[#121827] border border-gray-800 space-y-5"
+                  className="p-5 rounded-2xl bg-[#121827] border border-gray-800 space-y-4 hover:border-purple-500/40 transition-all shadow-lg"
                 >
                   {/* Topo do Card do Jogo */}
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-800 pb-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-800 pb-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-600/30 text-purple-300 border border-purple-500/30 uppercase">
-                          Teimosinha ({jogo.teimosinhaConcursos}x)
+                          {jogo.teimosinhaConcursos > 1
+                            ? `Teimosinha (${jogo.teimosinhaConcursos}x)`
+                            : "Aposta Única"}
                         </span>
+
+                        {aguardandoSorteio ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            Aguardando Sorteio da Caixa (C.{jogo.concursoInicial})
+                          </span>
+                        ) : apuracoesArray.length > 0 ? (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            ✓ Apurado (${apuracoesArray.length} sorteios)
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                            Pronto para Conferência
+                          </span>
+                        )}
+
                         <span className="text-xs text-gray-400">
-                          Aposta feita em: {jogo.dataAposta}
+                          Registrado em: {jogo.dataAposta}
                         </span>
                       </div>
+
                       <h3 className="text-base font-bold text-white mt-1">{jogo.grupoNome}</h3>
                       <p className="text-xs text-gray-400">
-                        Vigência: <strong>Concurso {jogo.concursoInicial}</strong> até{" "}
-                        <strong>Concurso {jogo.concursoFinal}</strong>
+                        Vigência: <strong>Concurso {jogo.concursoInicial}</strong>
+                        {jogo.concursoFinal !== jogo.concursoInicial && (
+                          <> até <strong>Concurso {jogo.concursoFinal}</strong></>
+                        )}
                       </p>
                     </div>
 
@@ -611,7 +580,7 @@ export default function AbaAfericao({
                     <div className="flex flex-wrap items-center gap-3">
                       <div className="text-right">
                         <span className="text-[11px] text-gray-400 block">Total Ganho:</span>
-                        <span className="text-lg font-bold text-emerald-400 font-mono">
+                        <span className="text-base font-bold text-emerald-400 font-mono">
                           {jogo.totalGanho.toLocaleString("pt-BR", {
                             style: "currency",
                             currency: "BRL",
@@ -631,17 +600,19 @@ export default function AbaAfericao({
                         </span>
                       </div>
 
+                      {/* Botão de Conferência Individual */}
                       <button
-                        onClick={() => handleAferirJogo(jogo)}
+                        onClick={() => handleAferirJogoIndividual(jogo)}
                         disabled={isAferindo}
-                        className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-emerald-600/20 cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-md shadow-purple-600/20 cursor-pointer"
+                        title="Verifica se este concurso já correu na Caixa e atualiza os acertos"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${isAferindo ? "animate-spin" : ""}`} />
-                        {isAferindo ? "Aferindo Caixa..." : "Aferir com a Caixa"}
+                        {isAferindo ? "Conferindo..." : "Conferir com a Caixa"}
                       </button>
 
                       <button
-                        onClick={() => handleExcluirJogo(jogo.id)}
+                        onClick={() => handleDesfazerJogo(jogo.id)}
                         className="p-2 rounded-xl text-gray-500 hover:text-rose-400 hover:bg-rose-950/20 transition-all cursor-pointer"
                         title="Excluir este jogo"
                       >
@@ -651,7 +622,7 @@ export default function AbaAfericao({
                   </div>
 
                   {/* Dezenas Apostadas */}
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <span className="text-xs text-gray-400 font-medium block">
                       15 Dezenas Apostadas neste Bilhete:
                     </span>
@@ -667,27 +638,21 @@ export default function AbaAfericao({
                     </div>
                   </div>
 
-                  {/* Concursos Apurados */}
-                  <div className="space-y-3 pt-2">
-                    <div className="flex items-center justify-between">
+                  {/* Apurações Oficiais Realizadas */}
+                  {apuracoesArray.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-gray-800/80">
                       <span className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
                         <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                        Resultados Apurados Oficialmente ({apuracoesArray.length} concursos checados)
+                        Concursos Apurados ({apuracoesArray.length})
                       </span>
-                    </div>
 
-                    {apuracoesArray.length === 0 ? (
-                      <div className="p-4 rounded-xl bg-gray-900/40 border border-gray-800 text-xs text-gray-500 text-center">
-                        Clique no botão <strong>"Aferir com a Caixa"</strong> acima para sincronizar com os concursos mais recentes.
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-80 overflow-y-auto pr-1">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1">
                         {apuracoesArray.map((ap) => {
                           const isPremiado = ap.acertos >= 11;
                           return (
                             <div
                               key={ap.concurso}
-                              className={`p-3 rounded-xl border flex flex-col justify-between space-y-2.5 transition-all ${
+                              className={`p-3 rounded-xl border flex flex-col justify-between space-y-2 ${
                                 isPremiado
                                   ? "bg-emerald-950/25 border-emerald-500/40"
                                   : "bg-gray-900/60 border-gray-800"
@@ -766,8 +731,8 @@ export default function AbaAfericao({
                           );
                         })}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}

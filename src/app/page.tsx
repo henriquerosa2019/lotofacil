@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { ConcursoLotofacil, JogoRegistrado, RegistroSaque } from "@/lib/types";
-import { getJogosRegistrados, getSaquesRegistrados } from "@/lib/storage";
+import { getJogosRegistrados, getSaquesRegistrados, saveJogoRegistrado } from "@/lib/storage";
+import { apurarJogoComConcurso } from "@/lib/lotofacil-engine";
 import { gerarMelhoresQuinzenas } from "@/lib/lotofacil-engine";
 import historicalSeed from "@/lib/historical-seed.json";
 import Header from "@/components/Header";
@@ -68,18 +69,65 @@ export default function Home() {
   const totalInvestido = jogos.reduce((acc, j) => acc + j.custoTotal, 0);
   const totalGanhos = jogos.reduce((acc, j) => acc + j.totalGanho, 0);
 
-  const handleAbrirGanhadoresUltimo = () => {
-    if (ultimoConcurso) {
-      setModalGanhadoresConcurso(ultimoConcurso);
+  const handleAbrirGanhadoresUltimo = async () => {
+    let conc = ultimoConcurso;
+    try {
+      setLoadingApi(true);
+      const res = await fetch("/api/lotofacil");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.sucesso && data.concurso) {
+          conc = data.concurso;
+          setUltimoConcurso(conc);
+
+          // Apura automaticamente qualquer jogo registrado que pertença a este concurso
+          const jogosSalvos = getJogosRegistrados();
+          let houveAlteracao = false;
+          jogosSalvos.forEach((j) => {
+            if (conc && conc.numero >= j.concursoInicial && conc.numero <= j.concursoFinal) {
+              const resAp = apurarJogoComConcurso(j, conc);
+              if (resAp.pertenceAoConcurso) {
+                saveJogoRegistrado(resAp.jogoAtualizado);
+                houveAlteracao = true;
+              }
+            }
+          });
+          if (houveAlteracao) {
+            carregarDadosLocais();
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao buscar dados da Caixa:", e);
+    } finally {
+      setLoadingApi(false);
+    }
+
+    if (conc) {
+      setModalGanhadoresConcurso(conc);
       setModalGanhadoresAberto(true);
     } else if (historico && historico.length > 0) {
-      const ultimoSeed = historico[historico.length - 1];
-      setModalGanhadoresConcurso(ultimoSeed);
+      setModalGanhadoresConcurso(historico[historico.length - 1]);
       setModalGanhadoresAberto(true);
     }
   };
 
   const handleAbrirGanhadoresEspecifico = (c: ConcursoLotofacil) => {
+    // Apura qualquer jogo registrado que pertença a este concurso
+    const jogosSalvos = getJogosRegistrados();
+    let houveAlteracao = false;
+    jogosSalvos.forEach((j) => {
+      if (c.numero >= j.concursoInicial && c.numero <= j.concursoFinal) {
+        const resAp = apurarJogoComConcurso(j, c);
+        if (resAp.pertenceAoConcurso) {
+          saveJogoRegistrado(resAp.jogoAtualizado);
+          houveAlteracao = true;
+        }
+      }
+    });
+    if (houveAlteracao) {
+      carregarDadosLocais();
+    }
     setModalGanhadoresConcurso(c);
     setModalGanhadoresAberto(true);
   };
@@ -186,6 +234,7 @@ export default function Home() {
               onIrParaGerador={() => setActiveTab("analise")}
               ultimoConcurso={ultimoConcurso}
               gruposDisponiveis={gruposAtuais}
+              onVerResultado={handleAbrirGanhadoresUltimo}
             />
           )}
 
@@ -204,6 +253,7 @@ export default function Home() {
         concurso={modalGanhadoresConcurso}
         isOpen={modalGanhadoresAberto}
         onClose={() => setModalGanhadoresAberto(false)}
+        jogos={jogos}
       />
 
       {/* Footer */}
