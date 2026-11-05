@@ -1,22 +1,22 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ConcursoLotofacil, JogoRegistrado, RegistroSaque } from "@/lib/types";
 import { getJogosRegistrados, getSaquesRegistrados } from "@/lib/storage";
+import { gerarMelhoresQuinzenas } from "@/lib/lotofacil-engine";
 import historicalSeed from "@/lib/historical-seed.json";
 import Header from "@/components/Header";
 import AbaEstatisticas from "@/components/AbaEstatisticas";
-import AbaGeradorGrupos from "@/components/AbaGeradorGrupos";
 import AbaTeimosinha from "@/components/AbaTeimosinha";
 import AbaAfericao from "@/components/AbaAfericao";
 import AbaFinanceiro from "@/components/AbaFinanceiro";
 import ModalGanhadores from "@/components/ModalGanhadores";
-import { BarChart3, Sparkles, Calculator, Trophy, Wallet } from "lucide-react";
+import { Sparkles, Calculator, Trophy, Wallet } from "lucide-react";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<
-    "estatisticas" | "gerador" | "teimosinha" | "afericao" | "financeiro"
-  >("estatisticas");
+    "analise" | "teimosinha" | "afericao" | "financeiro"
+  >("analise");
 
   const [historico, setHistorico] = useState<ConcursoLotofacil[]>(historicalSeed as ConcursoLotofacil[]);
   const [ultimoConcurso, setUltimoConcurso] = useState<ConcursoLotofacil | null>(null);
@@ -84,6 +84,10 @@ export default function Home() {
     setModalGanhadoresAberto(true);
   };
 
+  const gruposAtuais = useMemo(() => {
+    return gerarMelhoresQuinzenas(historico, 20);
+  }, [historico]);
+
   return (
     <div className="min-h-screen flex flex-col bg-[#0b0f19] text-gray-100">
       {/* Header Fixo */}
@@ -102,27 +106,15 @@ export default function Home() {
         <div className="overflow-x-auto pb-1">
           <nav className="flex space-x-2 p-1.5 bg-[#121827] rounded-2xl border border-gray-800 w-max md:w-full">
             <button
-              onClick={() => setActiveTab("estatisticas")}
+              onClick={() => setActiveTab("analise")}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all ${
-                activeTab === "estatisticas"
+                activeTab === "analise"
                   ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
                   : "text-gray-400 hover:text-white hover:bg-gray-800/60"
               }`}
             >
-              <BarChart3 className="w-4 h-4" />
-              <span>Análise Probabilística</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("gerador")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all ${
-                activeTab === "gerador"
-                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
-                  : "text-gray-400 hover:text-white hover:bg-gray-800/60"
-              }`}
-            >
-              <Sparkles className="w-4 h-4" />
-              <span>Grupos de Elite (IA)</span>
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              <span>Janela de Análise & Melhores Quinzenas (IA)</span>
             </button>
 
             <button
@@ -145,8 +137,8 @@ export default function Home() {
                   : "text-gray-400 hover:text-white hover:bg-gray-800/60"
               }`}
             >
-              <Trophy className="w-4 h-4" />
-              <span>Aferição Oficial</span>
+              <Trophy className="w-4 h-4 text-emerald-400" />
+              <span>Aferição Oficial Caixa</span>
               {jogos.length > 0 && (
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
               )}
@@ -168,12 +160,9 @@ export default function Home() {
 
         {/* Tab Views */}
         <div>
-          {activeTab === "estatisticas" && (
-            <AbaEstatisticas historico={historico} />
-          )}
-
-          {activeTab === "gerador" && (
-            <AbaGeradorGrupos
+          {activeTab === "analise" && (
+            <AbaEstatisticas
+              historico={historico}
               ultimoConcurso={ultimoConcurso}
               jogos={jogos}
               onJogoRegistrado={carregarDadosLocais}
@@ -194,7 +183,9 @@ export default function Home() {
               jogos={jogos}
               onAtualizarJogos={carregarDadosLocais}
               onVisualizarGanhadoresConcurso={handleAbrirGanhadoresEspecifico}
-              onIrParaGerador={() => setActiveTab("gerador")}
+              onIrParaGerador={() => setActiveTab("analise")}
+              ultimoConcurso={ultimoConcurso}
+              gruposDisponiveis={gruposAtuais}
             />
           )}
 

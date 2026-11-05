@@ -331,3 +331,127 @@ export const GRUPOS_PADRAO: GrupoDezenas[] = [
     maxAcertosHistorico: 13,
   },
 ];
+
+/**
+ * Gera dinamicamente os 3 melhores conjuntos de 15 dezenas com base no número de concursos selecionado (Janela N).
+ */
+export function gerarMelhoresQuinzenas(
+  concursos: ConcursoLotofacil[],
+  janela: number
+): GrupoDezenas[] {
+  if (!concursos || concursos.length === 0) return GRUPOS_PADRAO;
+
+  const stats = analisarEstatisticas(concursos, janela);
+  const ultimoConcursoDezenas = concursos[concursos.length - 1]?.dezenas || [];
+  const quentesSet = new Set(stats.quentes);
+  const neutrasSet = new Set(stats.neutras);
+  const friasSet = new Set(stats.frias);
+  const historicoSets = new Set(
+    concursos.map((c) => [...c.dezenas].sort((a, b) => a - b).join(","))
+  );
+
+  const porFreq = Array.from({ length: 25 }, (_, i) => i + 1).sort((a, b) => {
+    const diff = stats.frequencias[b].total - stats.frequencias[a].total;
+    return diff !== 0 ? diff : a - b;
+  });
+
+  function otimizarQuinzenal(candidatas: number[]): number[] {
+    const pool = new Set(candidatas.slice(0, 15));
+    const restantes = Array.from({ length: 25 }, (_, i) => i + 1)
+      .filter((n) => !pool.has(n))
+      .sort((a, b) => stats.frequencias[b].total - stats.frequencias[a].total);
+
+    const arr = Array.from(pool);
+    const impares = arr.filter((n) => n % 2 !== 0);
+    const pares = arr.filter((n) => n % 2 === 0);
+
+    if (impares.length > 8) {
+      const imparesParaTrocar = impares.sort((a, b) => stats.frequencias[a].total - stats.frequencias[b].total);
+      const paresDisponiveis = restantes.filter((n) => n % 2 === 0);
+      while (pool.size === 15 && Array.from(pool).filter((n) => n % 2 !== 0).length > 8 && imparesParaTrocar.length > 0 && paresDisponiveis.length > 0) {
+        const outNum = imparesParaTrocar.shift()!;
+        const inNum = paresDisponiveis.shift()!;
+        pool.delete(outNum);
+        pool.add(inNum);
+      }
+    } else if (impares.length < 7) {
+      const paresParaTrocar = pares.sort((a, b) => stats.frequencias[a].total - stats.frequencias[b].total);
+      const imparesDisponiveis = restantes.filter((n) => n % 2 !== 0);
+      while (pool.size === 15 && Array.from(pool).filter((n) => n % 2 !== 0).length < 7 && paresParaTrocar.length > 0 && imparesDisponiveis.length > 0) {
+        const outNum = paresParaTrocar.shift()!;
+        const inNum = imparesDisponiveis.shift()!;
+        pool.delete(outNum);
+        pool.add(inNum);
+      }
+    }
+
+    const arrMold = Array.from(pool);
+    const mold = arrMold.filter((n) => MOLDURA.has(n));
+    if (mold.length < 9) {
+      const centroParaTrocar = arrMold.filter((n) => CENTRO.has(n)).sort((a, b) => stats.frequencias[a].total - stats.frequencias[b].total);
+      const moldDisponiveis = Array.from({ length: 25 }, (_, i) => i + 1)
+        .filter((n) => !pool.has(n) && MOLDURA.has(n))
+        .sort((a, b) => stats.frequencias[b].total - stats.frequencias[a].total);
+
+      while (pool.size === 15 && Array.from(pool).filter((n) => MOLDURA.has(n)).length < 9 && centroParaTrocar.length > 0 && moldDisponiveis.length > 0) {
+        const outNum = centroParaTrocar.shift()!;
+        const inNum = moldDisponiveis.shift()!;
+        pool.delete(outNum);
+        pool.add(inNum);
+      }
+    }
+
+    return Array.from(pool).sort((a, b) => a - b);
+  }
+
+  // GRUPO 1: Top Frequência da Janela com calibração áurea
+  const g1Nums = otimizarQuinzenal(porFreq);
+  const g1Aval = avaliarDezenas(g1Nums, ultimoConcursoDezenas, quentesSet, neutrasSet, friasSet, historicoSets);
+
+  // GRUPO 2: Equilíbrio Frequência + Retorno Cíclico
+  const topQuentes = porFreq.slice(0, 10);
+  const retornoCiclico = porFreq.slice(10).reverse().slice(0, 5);
+  const g2Nums = otimizarQuinzenal([...topQuentes, ...retornoCiclico]);
+  const g2Aval = avaliarDezenas(g2Nums, ultimoConcursoDezenas, quentesSet, neutrasSet, friasSet, historicoSets);
+
+  // GRUPO 3: Harmonia Linear (3 dezenas por linha do volante 5x5)
+  const linhas: number[][] = [
+    [1, 2, 3, 4, 5],
+    [6, 7, 8, 9, 10],
+    [11, 12, 13, 14, 15],
+    [16, 17, 18, 19, 20],
+    [21, 22, 23, 24, 25],
+  ];
+  const g3Candidatas: number[] = [];
+  linhas.forEach((linha) => {
+    const linhaOrdenada = [...linha].sort((a, b) => stats.frequencias[b].total - stats.frequencias[a].total);
+    g3Candidatas.push(...linhaOrdenada.slice(0, 3));
+  });
+  const g3Nums = otimizarQuinzenal(g3Candidatas);
+  const g3Aval = avaliarDezenas(g3Nums, ultimoConcursoDezenas, quentesSet, neutrasSet, friasSet, historicoSets);
+
+  return [
+    {
+      id: `grupo-1-${janela}`,
+      nome: `Grupo 01 — Alta Frequência (${janela} conc.)`,
+      descricao: `Quinzenal de maior densidade e convergência calibrado nos últimos ${janela} concursos.`,
+      dezenas: g1Nums,
+      ...g1Aval,
+    },
+    {
+      id: `grupo-2-${janela}`,
+      nome: `Grupo 02 — Retorno Cíclico & Pressão (${janela} conc.)`,
+      descricao: `Mescla as dezenas mais consistentes com dezenas em ponto de retorno cíclico na janela de ${janela} jogos.`,
+      dezenas: g2Nums,
+      ...g2Aval,
+    },
+    {
+      id: `grupo-3-${janela}`,
+      nome: `Grupo 03 — Harmonia Linear 5x5 (${janela} conc.)`,
+      descricao: `Distribuição espacial equilibrada de 3 dezenas por faixa do volante calibrada na janela de ${janela} sorteios.`,
+      dezenas: g3Nums,
+      ...g3Aval,
+    },
+  ];
+}
+
