@@ -12,7 +12,7 @@ interface HeaderProps {
   totalGanhos: number;
   totalSacado?: number;
   saldoDisponivelSaque?: number;
-  onOpenGanhadores: () => void;
+  onOpenGanhadores: (concursoNum?: number) => void;
   onIrParaFinanceiro?: () => void;
 }
 
@@ -27,7 +27,24 @@ export default function Header({
   onOpenGanhadores,
   onIrParaFinanceiro,
 }: HeaderProps) {
+  const [concursoInput, setConcursoInput] = React.useState<string>("");
   const saldoLiquido = totalGanhos - totalInvestido;
+
+  const handleBuscarResultado = () => {
+    const num = parseInt(concursoInput.trim(), 10);
+    if (!isNaN(num) && num > 0) {
+      onOpenGanhadores(num);
+    } else {
+      onOpenGanhadores();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleBuscarResultado();
+    }
+  };
 
   return (
     <header className="border-b border-gray-800 bg-[#101626]/80 backdrop-blur-md sticky top-0 z-30 px-4 py-3">
@@ -54,18 +71,39 @@ export default function Header({
 
         {/* Caixa Status & Quick Stats */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Botão Principal de Ver Resultado em Tempo Real */}
-          <button
-            onClick={onOpenGanhadores}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-purple-700/80 to-fuchsia-600/80 hover:from-purple-600 hover:to-fuchsia-500 border border-purple-400/50 text-white font-medium text-xs transition-all cursor-pointer shadow-md shadow-purple-900/40 group active:scale-95"
-            title="Clique para buscar o concurso atual da Caixa em tempo real e conferir com seus jogos"
-          >
-            <Trophy className="w-4 h-4 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
-            <span>
-              <strong>★ Ver Resultado (Caixa)</strong>
-              {ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}
-            </span>
-          </button>
+          {/* Barra de Aferição Caixa com Concurso Opcional */}
+          <div className="flex items-center rounded-xl bg-gray-900/90 border border-purple-500/40 p-1 shadow-md shadow-purple-950/20">
+            <input
+              type="number"
+              placeholder={ultimoConcurso ? `C.${ultimoConcurso.numero}` : "Nº Conc."}
+              value={concursoInput}
+              onChange={(e) => setConcursoInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-20 sm:w-24 bg-black/60 border border-gray-700/60 rounded-lg px-2 py-1 text-xs text-purple-200 font-mono font-bold text-center outline-none focus:border-purple-400 placeholder:text-gray-500"
+              title="Digite o número do concurso que deseja aferir ou deixe em branco para o último da Caixa"
+            />
+            <button
+              onClick={handleBuscarResultado}
+              className="ml-1.5 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-700 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold text-xs transition-all cursor-pointer shadow-md shadow-purple-900/40 group active:scale-95"
+              title={
+                concursoInput.trim()
+                  ? `Clique para aferir oficialmente o Concurso ${concursoInput.trim()} na Caixa`
+                  : `Clique para aferir o último concurso apurado pela Caixa${ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}`
+              }
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
+              <span>
+                {concursoInput.trim() ? (
+                  <>Aferir C.{concursoInput.trim()}</>
+                ) : (
+                  <>
+                    <strong>★ Ver Resultado (Caixa)</strong>
+                    {ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}
+                  </>
+                )}
+              </span>
+            </button>
+          </div>
 
           {/* Saldo Acumulado a Sacar (Debitado conforme saques) */}
           <div

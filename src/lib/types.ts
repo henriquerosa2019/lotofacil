@@ -29,6 +29,9 @@ export interface HistoricoConsultaConcurso {
   acumulado?: boolean;
   ganhadores15: number;
   valor15: number;
+  totalPremiosPagos?: number;
+  totalGanhadores?: number;
+  valorArrecadado?: number;
   cidadesGanhadores: Array<{
     ganhadores: number;
     municipio: string;

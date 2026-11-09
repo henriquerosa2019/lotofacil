@@ -48,7 +48,7 @@ export async function GET(
   }
 
   // 2. Tenta base histórica local seed
-  const found = historicalSeed.find((c) => c.numero === concursoNum);
+  const found = historicalSeed.find((c) => c.numero === concursoNum) as any;
   if (found) {
     return NextResponse.json({
       sucesso: true,
@@ -57,14 +57,19 @@ export async function GET(
         numero: found.numero,
         dataApuracao: found.dataApuracao,
         dezenas: found.dezenas,
-        listaRateioPremio: [
-          { descricaoFaixa: "15 acertos", faixa: 1, numeroDeGanhadores: 2, valorPremio: 2000000.0 },
-          { descricaoFaixa: "14 acertos", faixa: 2, numeroDeGanhadores: 350, valorPremio: 1500.0 },
-          { descricaoFaixa: "13 acertos", faixa: 3, numeroDeGanhadores: 12000, valorPremio: 30.0 },
-          { descricaoFaixa: "12 acertos", faixa: 4, numeroDeGanhadores: 160000, valorPremio: 12.0 },
-          { descricaoFaixa: "11 acertos", faixa: 5, numeroDeGanhadores: 850000, valorPremio: 6.0 },
-        ],
-        listaMunicipioUFGanhadores: [],
+        acumulado: found.acumulado ?? false,
+        valorArrecadado: found.valorArrecadado ?? 0,
+        valorEstimadoProximoConcurso: found.valorEstimadoProximoConcurso ?? 0,
+        listaRateioPremio: found.listaRateioPremio && found.listaRateioPremio.length > 0
+          ? found.listaRateioPremio
+          : [
+              { descricaoFaixa: "15 acertos", faixa: 1, numeroDeGanhadores: 2, valorPremio: 2000000.0 },
+              { descricaoFaixa: "14 acertos", faixa: 2, numeroDeGanhadores: 350, valorPremio: 1500.0 },
+              { descricaoFaixa: "13 acertos", faixa: 3, numeroDeGanhadores: 12000, valorPremio: 30.0 },
+              { descricaoFaixa: "12 acertos", faixa: 4, numeroDeGanhadores: 160000, valorPremio: 12.0 },
+              { descricaoFaixa: "11 acertos", faixa: 5, numeroDeGanhadores: 850000, valorPremio: 6.0 },
+            ],
+        listaMunicipioUFGanhadores: found.listaMunicipioUFGanhadores || [],
       },
     });
   }

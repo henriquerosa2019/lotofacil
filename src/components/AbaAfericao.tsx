@@ -33,7 +33,7 @@ interface AbaAfericaoProps {
   onIrParaGerador: () => void;
   ultimoConcurso: ConcursoLotofacil | null;
   gruposDisponiveis?: GrupoDezenas[];
-  onVerResultado?: () => void;
+  onVerResultado?: (concursoNum?: number) => void;
   saldoDisponivelSaque?: number;
   onIrParaFinanceiro?: () => void;
 }
@@ -64,6 +64,24 @@ export default function AbaAfericao({
   const [aferindoId, setAferindoId] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "info" | "erro"; texto: string } | null>(null);
   const [ultimoJogoSalvoId, setUltimoJogoSalvoId] = useState<string | null>(null);
+  const [concursoParaAferir, setConcursoParaAferir] = useState<string>("");
+
+  const handleExecutarAfericao = (numOpcional?: number) => {
+    const alvo = numOpcional || (concursoParaAferir.trim() ? parseInt(concursoParaAferir.trim(), 10) : undefined);
+    if (alvo && !isNaN(alvo) && alvo > 0) {
+      if (onVerResultado) {
+        onVerResultado(alvo);
+      } else {
+        onVisualizarGanhadoresConcurso(alvo);
+      }
+    } else {
+      if (onVerResultado) {
+        onVerResultado();
+      } else if (ultimoConcurso) {
+        onVisualizarGanhadoresConcurso(ultimoConcurso.numero);
+      }
+    }
+  };
 
   // Painel de cruzamento visual ativo (quando confere com a Caixa)
   const [cruzamentoAtivo, setCruzamentoAtivo] = useState<CruzamentoVisual | null>(null);
@@ -297,7 +315,7 @@ export default function AbaAfericao({
           {onVerResultado && (
             <button
               type="button"
-              onClick={onVerResultado}
+              onClick={() => handleExecutarAfericao()}
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-700 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold text-xs shadow-lg shadow-purple-900/40 transition-all cursor-pointer group active:scale-95 shrink-0"
               title="Busca o resultado oficial da Caixa em tempo real e confere os jogos do concurso correspondente"
             >
@@ -647,6 +665,82 @@ export default function AbaAfericao({
           )}
         </div>
       )}
+
+      {/* PAINEL DE AFERIÇÃO OFICIAL POR NÚMERO DE CONCURSO */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-gray-900 via-[#141a2c] to-gray-900 border border-purple-500/30 shadow-lg space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-2.5">
+          <div className="flex items-center gap-2">
+            <Search className="w-4 h-4 text-purple-400" />
+            <h3 className="text-sm font-bold text-white">
+              Aferição Oficial Caixa por Número de Concurso
+            </h3>
+          </div>
+          <span className="text-xs text-gray-400">
+            Forneça o concurso desejado ou clique em um atalho recente
+          </span>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          <div className="relative flex-1">
+            <input
+              type="number"
+              placeholder={ultimoConcurso ? `Digite o concurso (ex: 3820, 3822, 3823, ${ultimoConcurso.numero})...` : "Digite o concurso..."}
+              value={concursoParaAferir}
+              onChange={(e) => setConcursoParaAferir(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleExecutarAfericao();
+                }
+              }}
+              className="w-full bg-black/60 border border-purple-500/40 rounded-xl px-3 py-2 text-xs text-purple-200 font-mono font-bold outline-none focus:border-purple-400 placeholder:text-gray-500"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => handleExecutarAfericao()}
+              className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-900/30 transition-all cursor-pointer active:scale-95 flex-1 sm:flex-initial"
+            >
+              <Search className="w-3.5 h-3.5" />
+              <span>{concursoParaAferir.trim() ? `Aferir C.${concursoParaAferir.trim()}` : "Aferir Último Concurso"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setConcursoParaAferir("");
+                handleExecutarAfericao();
+              }}
+              className="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-amber-300 font-semibold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+              title="Aferir o último concurso apurado pela Caixa Econômica Federal"
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              <span>Último ({ultimoConcurso?.numero || 3824})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Atalhos Rápidos para Concursos Recentes */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <span className="text-[11px] text-gray-400 font-medium mr-1">Atalhos rápidos:</span>
+          {[3824, 3823, 3822, 3821, 3820].map((num) => (
+            <button
+              key={num}
+              type="button"
+              onClick={() => {
+                setConcursoParaAferir(num.toString());
+                handleExecutarAfericao(num);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-gray-900 hover:bg-purple-950/80 border border-gray-800 hover:border-purple-500/50 text-gray-300 hover:text-white font-mono text-[11px] font-semibold transition-all cursor-pointer"
+              title={`Clique para aferir imediatamente o Concurso ${num}`}
+            >
+              C.{num}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* 2. HISTÓRICO DE JOGOS REGISTRADOS & CONFERÊNCIA POR CONCURSO */}
       <div className="space-y-4">

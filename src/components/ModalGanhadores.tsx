@@ -46,6 +46,16 @@ export default function ModalGanhadores({
   const ganhadores15 = faixa15?.numeroDeGanhadores || 0;
   const valor15 = faixa15?.valorPremio || 0;
 
+  // Totalização de ganhadores e prêmios em todas as faixas do concurso
+  const totalGeralGanhadores = (concursoEmExibicao.listaRateioPremio || []).reduce(
+    (acc, f) => acc + f.numeroDeGanhadores,
+    0
+  );
+  const totalGeralPremios = (concursoEmExibicao.listaRateioPremio || []).reduce(
+    (acc, f) => acc + f.numeroDeGanhadores * f.valorPremio,
+    0
+  );
+
   const cidades = concursoEmExibicao.listaMunicipioUFGanhadores || [];
 
   // Jogos registrados que pertencem a este concurso específico
@@ -193,11 +203,14 @@ export default function ModalGanhadores({
                         <div className="text-right">
                           <span className="text-[11px] text-amber-400 font-semibold block">
                             {item.ganhadores15 === 0
-                              ? "Acumulou"
-                              : `${item.ganhadores15} ganhador${item.ganhadores15 > 1 ? "es" : ""}`}
+                              ? "15 acertos: Acumulou"
+                              : `15 acertos: ${item.ganhadores15} ganhador${item.ganhadores15 > 1 ? "es" : ""}`}
                           </span>
-                          <span className="text-emerald-400 font-mono text-xs font-bold">
+                          <span className="text-emerald-400 font-mono text-xs font-bold block">
                             {item.valor15.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                          </span>
+                          <span className="text-[10px] text-purple-300 font-mono block mt-0.5">
+                            Total Pago: {(item.totalPremiosPagos || (item.rateioCompleto || []).reduce((acc, f) => acc + (f.numeroDeGanhadores * f.valorPremio), 0)).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                           </span>
                         </div>
 
@@ -356,6 +369,49 @@ export default function ModalGanhadores({
                 </div>
               </div>
 
+              {/* Card Destaque: Prêmio Total Pago no Concurso */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 via-purple-950/40 to-[#121827] border-2 border-emerald-500/50 shadow-lg space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-emerald-400" />
+                    <span className="text-xs font-bold text-gray-200 uppercase tracking-wider">
+                      Resumo Geral de Prêmios — Concurso {concursoEmExibicao.numero}
+                    </span>
+                  </div>
+                  {concursoEmExibicao.valorArrecadado ? (
+                    <span className="text-xs text-gray-400">
+                      Arrecadação Total Caixa: <strong className="text-white font-mono">{concursoEmExibicao.valorArrecadado.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong>
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div className="p-3 rounded-lg bg-black/50 border border-emerald-500/40">
+                    <span className="text-[11px] text-gray-400 block font-semibold uppercase tracking-wider">
+                      💰 Total Pago em Prêmios:
+                    </span>
+                    <span className="text-xl sm:text-2xl font-extrabold text-emerald-400 font-mono mt-1 block">
+                      {totalGeralPremios.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </span>
+                    <span className="text-[10px] text-gray-400 mt-0.5 block">
+                      Soma total paga em todas as faixas (15, 14, 13, 12 e 11 acertos)
+                    </span>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-black/50 border border-purple-500/40">
+                    <span className="text-[11px] text-gray-400 block font-semibold uppercase tracking-wider">
+                      👥 Total de Bilhetes Premiados:
+                    </span>
+                    <span className="text-xl sm:text-2xl font-extrabold text-purple-300 font-mono mt-1 block">
+                      {totalGeralGanhadores.toLocaleString("pt-BR")} apostas
+                    </span>
+                    <span className="text-[10px] text-gray-400 mt-0.5 block">
+                      Total de ganhadores contemplados neste concurso
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* Destaque 15 Acertos */}
               <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-purple-950/20 to-black/30 border border-amber-500/30 space-y-3">
                 <div className="flex items-center justify-between">
@@ -426,38 +482,72 @@ export default function ModalGanhadores({
                 </div>
               </div>
 
-              {/* Rateio das Demais Faixas (14, 13, 12, 11) */}
+              {/* Rateio Completo com Totalização por Faixa */}
               <div>
-                <span className="text-xs text-gray-400 block mb-2 font-medium">
-                  Rateio Completo das Faixas de Premiação:
-                </span>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-300 font-semibold">
+                    Rateio Completo das Faixas de Premiação:
+                  </span>
+                  <span className="text-xs font-mono text-emerald-400 font-bold">
+                    Total Pago: {totalGeralPremios.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </span>
+                </div>
                 <div className="overflow-x-auto rounded-xl border border-gray-800">
                   <table className="w-full text-xs text-left">
                     <thead className="bg-gray-900/90 text-gray-400 border-b border-gray-800">
                       <tr>
-                        <th className="py-2 px-3">Faixa</th>
-                        <th className="py-2 px-3 text-center">Ganhadores</th>
-                        <th className="py-2 px-3 text-right">Prêmio por Ganhador</th>
+                        <th className="py-2.5 px-3">Faixa</th>
+                        <th className="py-2.5 px-3 text-center">Ganhadores</th>
+                        <th className="py-2.5 px-3 text-right">Prêmio por Ganhador</th>
+                        <th className="py-2.5 px-3 text-right text-emerald-300 font-semibold">Total Pago na Faixa</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800 bg-gray-950/40">
-                      {(concursoEmExibicao.listaRateioPremio || []).map((f) => (
-                        <tr key={f.faixa} className="hover:bg-white/5">
-                          <td className="py-2 px-3 font-medium text-gray-200">
-                            {f.descricaoFaixa}
-                          </td>
-                          <td className="py-2 px-3 text-center text-gray-300 font-mono">
-                            {f.numeroDeGanhadores.toLocaleString("pt-BR")}
-                          </td>
-                          <td className="py-2 px-3 text-right font-semibold text-emerald-400 font-mono">
-                            {f.valorPremio.toLocaleString("pt-BR", {
-                              style: "currency",
-                              currency: "BRL",
-                            })}
-                          </td>
-                        </tr>
-                      ))}
+                      {(concursoEmExibicao.listaRateioPremio || []).map((f) => {
+                        const totalFaixa = f.numeroDeGanhadores * f.valorPremio;
+                        return (
+                          <tr key={f.faixa} className="hover:bg-white/5">
+                            <td className="py-2.5 px-3 font-medium text-gray-200">
+                              {f.descricaoFaixa}
+                            </td>
+                            <td className="py-2.5 px-3 text-center text-gray-300 font-mono">
+                              {f.numeroDeGanhadores.toLocaleString("pt-BR")}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-semibold text-emerald-400 font-mono">
+                              {f.valorPremio.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-white font-mono">
+                              {totalFaixa.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
+                    <tfoot className="border-t-2 border-emerald-500/50 bg-emerald-950/40 font-bold">
+                      <tr>
+                        <td className="py-2.5 px-3 text-emerald-300 uppercase tracking-wider text-[11px]">
+                          TOTAL GERAL DE PRÊMIOS PAGOS
+                        </td>
+                        <td className="py-2.5 px-3 text-center text-white font-mono">
+                          {totalGeralGanhadores.toLocaleString("pt-BR")}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-gray-500 font-mono">
+                          —
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-emerald-400 font-mono text-sm">
+                          {totalGeralPremios.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}
+                        </td>
+                      </tr>
+                    </tfoot>
                   </table>
                 </div>
               </div>

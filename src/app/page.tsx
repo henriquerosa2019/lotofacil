@@ -73,13 +73,20 @@ export default function Home() {
   const saldoDisponivelSaque = Math.max(0, totalGanhos - totalSacado);
 
   /**
-   * Ao clicar em "Ver Resultado (Caixa)":
-   * 1. Busca o concurso atual da Caixa em tempo real.
-   * 2. Compara com os jogos registrados (grupos da IA ou personalizados).
-   * 3. Se houver acertos, grava a apuração no histórico e acumula o saldo.
-   * 4. Abre o modal com os dados oficiais e o cruzamento dos acertos.
+   * Ao clicar em "Ver Resultado (Caixa)" ou fornecer um concurso específico:
+   * 1. Se concursoOpcional for fornecido, busca e afere aquele concurso específico.
+   * 2. Se omitido, busca o concurso atual da Caixa em tempo real (último apurado).
+   * 3. Registra a consulta no histórico para posterior conferência.
+   * 4. Cruza com os jogos registrados (grupos da IA ou personalizados).
+   * 5. Se houver acertos, grava a apuração e acumula o saldo na conta.
+   * 6. Abre o modal com detalhamento completo e totalização de prêmios.
    */
-  const handleAbrirGanhadoresUltimo = async () => {
+  const handleAbrirGanhadoresUltimo = async (concursoOpcional?: number) => {
+    if (concursoOpcional && typeof concursoOpcional === "number" && concursoOpcional > 0) {
+      await handleAbrirGanhadoresEspecifico(concursoOpcional);
+      return;
+    }
+
     const concApi = await buscarDadosCaixa();
     let conc = concApi || ultimoConcurso;
 
@@ -88,6 +95,9 @@ export default function Home() {
     }
 
     if (conc) {
+      // Registra a consulta no histórico
+      saveHistoricoConsulta(conc);
+
       // Apura qualquer jogo registrado que pertença a este concurso
       const jogosSalvos = getJogosRegistrados();
       let houveAlteracao = false;

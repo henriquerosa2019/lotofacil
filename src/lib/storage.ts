@@ -1,4 +1,5 @@
 import { JogoRegistrado, RegistroSaque, HistoricoConsultaConcurso, ConcursoLotofacil } from "./types";
+import historicalSeed from "./historical-seed.json";
 
 const KEY_JOGOS = "lotofacil_jogos_registrados";
 const KEY_SAQUES = "lotofacil_saques_registrados";
@@ -69,7 +70,63 @@ export function getHistoricoConsultas(): HistoricoConsultaConcurso[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(KEY_HISTORICO_CONSULTAS);
-    return raw ? JSON.parse(raw) : [];
+    let list: HistoricoConsultaConcurso[] = raw ? JSON.parse(raw) : [];
+
+    // Garante que os concursos recentes (como 3824, 3823, 3822, 3821, 3820) estejam sempre no histórico
+    const seedArray = historicalSeed as ConcursoLotofacil[];
+    const concursosChave = [3824, 3823, 3822, 3821, 3820];
+    let houveInclusao = false;
+
+    concursosChave.forEach((num) => {
+      if (!list.some((item) => item.numero === num)) {
+        const c = seedArray.find((item) => item.numero === num);
+        if (c) {
+          const faixa15 = c.listaRateioPremio?.find((f) => f.faixa === 1);
+          const totalPremios = (c.listaRateioPremio || []).reduce(
+            (acc, f) => acc + (f.numeroDeGanhadores * f.valorPremio),
+            0
+          );
+          const totalGanhadores = (c.listaRateioPremio || []).reduce(
+            (acc, f) => acc + f.numeroDeGanhadores,
+            0
+          );
+
+          list.push({
+            numero: c.numero,
+            dataApuracao: c.dataApuracao,
+            consultadoEm: "Oficial Caixa",
+            dezenas: c.dezenas,
+            acumulado: c.acumulado,
+            ganhadores15: faixa15?.numeroDeGanhadores || 0,
+            valor15: faixa15?.valorPremio || 0,
+            totalPremiosPagos: totalPremios,
+            totalGanhadores: totalGanhadores,
+            valorArrecadado: c.valorArrecadado,
+            cidadesGanhadores: (c.listaMunicipioUFGanhadores || []).map((m) => ({
+              municipio: m.municipio,
+              uf: m.uf,
+              ganhadores: m.ganhadores,
+            })),
+            rateioCompleto: (c.listaRateioPremio || []).map((r) => ({
+              descricaoFaixa: r.descricaoFaixa,
+              faixa: r.faixa,
+              numeroDeGanhadores: r.numeroDeGanhadores,
+              valorPremio: r.valorPremio,
+            })),
+          });
+          houveInclusao = true;
+        }
+      }
+    });
+
+    // Ordena do maior para o menor concurso
+    list.sort((a, b) => b.numero - a.numero);
+
+    if (houveInclusao) {
+      localStorage.setItem(KEY_HISTORICO_CONSULTAS, JSON.stringify(list.slice(0, 100)));
+    }
+
+    return list;
   } catch {
     return [];
   }
@@ -80,6 +137,15 @@ export function saveHistoricoConsulta(c: ConcursoLotofacil): void {
   const atuais = getHistoricoConsultas();
   const faixa15 = c.listaRateioPremio?.find((f) => f.faixa === 1);
 
+  const totalPremios = (c.listaRateioPremio || []).reduce(
+    (acc, f) => acc + (f.numeroDeGanhadores * f.valorPremio),
+    0
+  );
+  const totalGanhadores = (c.listaRateioPremio || []).reduce(
+    (acc, f) => acc + f.numeroDeGanhadores,
+    0
+  );
+
   const novoRegistro: HistoricoConsultaConcurso = {
     numero: c.numero,
     dataApuracao: c.dataApuracao,
@@ -88,6 +154,9 @@ export function saveHistoricoConsulta(c: ConcursoLotofacil): void {
     acumulado: c.acumulado,
     ganhadores15: faixa15?.numeroDeGanhadores || 0,
     valor15: faixa15?.valorPremio || 0,
+    totalPremiosPagos: totalPremios,
+    totalGanhadores: totalGanhadores,
+    valorArrecadado: c.valorArrecadado,
     cidadesGanhadores: (c.listaMunicipioUFGanhadores || []).map((m) => ({
       municipio: m.municipio,
       uf: m.uf,
@@ -108,6 +177,9 @@ export function saveHistoricoConsulta(c: ConcursoLotofacil): void {
   } else {
     atuais.unshift(novoRegistro);
   }
+
+  // Ordena sempre por concurso decrescente
+  atuais.sort((a, b) => b.numero - a.numero);
 
   // Mantém os últimos 100 concursos no histórico local
   const limitados = atuais.slice(0, 100);
