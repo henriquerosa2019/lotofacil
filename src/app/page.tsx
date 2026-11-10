@@ -9,13 +9,14 @@ import Header from "@/components/Header";
 import AbaEstatisticas from "@/components/AbaEstatisticas";
 import AbaTeimosinha from "@/components/AbaTeimosinha";
 import AbaAfericao from "@/components/AbaAfericao";
+import AbaHistorico from "@/components/AbaHistorico";
 import AbaFinanceiro from "@/components/AbaFinanceiro";
 import ModalGanhadores from "@/components/ModalGanhadores";
-import { Sparkles, Calculator, Trophy, Wallet } from "lucide-react";
+import { Sparkles, Calculator, Trophy, Wallet, History } from "lucide-react";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<
-    "analise" | "teimosinha" | "afericao" | "financeiro"
+    "analise" | "teimosinha" | "afericao" | "historico" | "financeiro"
   >("analise");
 
   const [historico, setHistorico] = useState<ConcursoLotofacil[]>(historicalSeed as ConcursoLotofacil[]);
@@ -248,6 +249,21 @@ export default function Home() {
             </button>
 
             <button
+              onClick={() => setActiveTab("historico")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all relative ${
+                activeTab === "historico"
+                  ? "bg-purple-600 text-white shadow-lg shadow-purple-600/30"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800/60"
+              }`}
+            >
+              <History className="w-4 h-4 text-purple-300" />
+              <span>Histórico</span>
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 ml-0.5">
+                {historico.length.toLocaleString("pt-BR")}
+              </span>
+            </button>
+
+            <button
               onClick={() => setActiveTab("financeiro")}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all ${
                 activeTab === "financeiro"
@@ -297,6 +313,16 @@ export default function Home() {
               onVerResultado={handleAbrirGanhadoresUltimo}
               saldoDisponivelSaque={saldoDisponivelSaque}
               onIrParaFinanceiro={() => setActiveTab("financeiro")}
+            />
+          )}
+
+          {activeTab === "historico" && (
+            <AbaHistorico
+              historico={historico}
+              ultimoConcurso={ultimoConcurso}
+              jogos={jogos}
+              onVisualizarConcurso={handleAbrirGanhadoresEspecifico}
+              onIrParaAfericao={() => setActiveTab("afericao")}
             />
           )}
 
