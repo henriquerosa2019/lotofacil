@@ -73,6 +73,24 @@ export default function Home() {
   const totalSacado = saques.reduce((acc, s) => acc + s.valor, 0);
   const saldoDisponivelSaque = Math.max(0, totalGanhos - totalSacado);
 
+  // Quantidade de concursos jogados pelo usuário que já foram apurados
+  const concursosJogadosApuradosCount = useMemo(() => {
+    const ultimoNum = ultimoConcurso?.numero || 3824;
+    const concursosSet = new Set<number>();
+    jogos.forEach((j) => {
+      const fim = Math.min(j.concursoFinal, ultimoNum);
+      for (let c = j.concursoInicial; c <= fim; c++) {
+        concursosSet.add(c);
+      }
+    });
+    if (concursosSet.size === 0) {
+      for (let c = 3820; c <= ultimoNum; c++) {
+        concursosSet.add(c);
+      }
+    }
+    return concursosSet.size;
+  }, [jogos, ultimoConcurso]);
+
   /**
    * Ao clicar em "Ver Resultado (Caixa)" ou fornecer um concurso específico:
    * 1. Se concursoOpcional for fornecido, busca e afere aquele concurso específico.
@@ -257,9 +275,9 @@ export default function Home() {
               }`}
             >
               <History className="w-4 h-4 text-purple-300" />
-              <span>Histórico</span>
+              <span>Histórico da Teimosinha</span>
               <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 ml-0.5">
-                {historico.length.toLocaleString("pt-BR")}
+                {concursosJogadosApuradosCount} apurados
               </span>
             </button>
 
