@@ -23,6 +23,7 @@ import AbaAfericao from "@/components/AbaAfericao";
 import AbaHistorico from "@/components/AbaHistorico";
 import AbaFinanceiro from "@/components/AbaFinanceiro";
 import ModalGanhadores from "@/components/ModalGanhadores";
+import CelebracaoVitoria, { DadosCelebracao } from "@/components/CelebracaoVitoria";
 import { Sparkles, Calculator, Trophy, Wallet, History } from "lucide-react";
 
 export default function Home() {
@@ -41,6 +42,15 @@ export default function Home() {
 
   const [jogos, setJogos] = useState<JogoRegistrado[]>([]);
   const [saques, setSaques] = useState<RegistroSaque[]>([]);
+
+  // Celebração festiva com sinal sonoro de 5 segundos, balões e "UHUUUU GANHAMOS!!!!"
+  const [celebracaoAtiva, setCelebracaoAtiva] = useState<boolean>(false);
+  const [celebracaoDados, setCelebracaoDados] = useState<DadosCelebracao | null>(null);
+
+  const dispararCelebracao = useCallback((dados: DadosCelebracao) => {
+    setCelebracaoDados(dados);
+    setCelebracaoAtiva(true);
+  }, []);
 
   // Modal de Ganhadores
   const [modalGanhadoresConcurso, setModalGanhadoresConcurso] = useState<ConcursoLotofacil | null>(null);
@@ -205,6 +215,7 @@ export default function Home() {
       // Apura qualquer jogo registrado que pertença a este concurso
       const jogosSalvos = getJogosRegistrados();
       let houveAlteracao = false;
+      let melhorPremiado: DadosCelebracao | null = null;
 
       jogosSalvos.forEach((j) => {
         if (conc && conc.numero >= j.concursoInicial && conc.numero <= j.concursoFinal) {
@@ -212,12 +223,29 @@ export default function Home() {
           if (resAp.pertenceAoConcurso) {
             saveJogoRegistrado(resAp.jogoAtualizado);
             houveAlteracao = true;
+
+            // Se o jogo teve dezenas sorteadas / premiado (11 a 15 pontos)
+            if (resAp.acertos >= 11) {
+              if (!melhorPremiado || resAp.acertos > melhorPremiado.acertos) {
+                melhorPremiado = {
+                  acertos: resAp.acertos,
+                  valorGanho: resAp.valorGanho,
+                  concurso: conc.numero,
+                  grupoNome: j.grupoNome,
+                  dezenasAcertadas: resAp.dezenasAcertadas,
+                };
+              }
+            }
           }
         }
       });
 
       if (houveAlteracao) {
         carregarDadosLocais();
+      }
+
+      if (melhorPremiado) {
+        dispararCelebracao(melhorPremiado);
       }
 
       setModalGanhadoresConcurso(conc);
@@ -270,17 +298,37 @@ export default function Home() {
       // Apura qualquer jogo registrado que pertença a este concurso
       const jogosSalvos = getJogosRegistrados();
       let houveAlteracao = false;
+      let melhorPremiado: DadosCelebracao | null = null;
+
       jogosSalvos.forEach((j) => {
         if (concCompleto && concCompleto.numero >= j.concursoInicial && concCompleto.numero <= j.concursoFinal) {
           const resAp = apurarJogoComConcurso(j, concCompleto);
           if (resAp.pertenceAoConcurso) {
             saveJogoRegistrado(resAp.jogoAtualizado);
             houveAlteracao = true;
+
+            // Se o jogo teve dezenas sorteadas / premiado (11 a 15 pontos)
+            if (resAp.acertos >= 11) {
+              if (!melhorPremiado || resAp.acertos > melhorPremiado.acertos) {
+                melhorPremiado = {
+                  acertos: resAp.acertos,
+                  valorGanho: resAp.valorGanho,
+                  concurso: concCompleto.numero,
+                  grupoNome: j.grupoNome,
+                  dezenasAcertadas: resAp.dezenasAcertadas,
+                };
+              }
+            }
           }
         }
       });
+
       if (houveAlteracao) {
         carregarDadosLocais();
+      }
+
+      if (melhorPremiado) {
+        dispararCelebracao(melhorPremiado);
       }
 
       setModalGanhadoresConcurso(concCompleto);
@@ -417,6 +465,7 @@ export default function Home() {
               onVerResultado={handleAbrirGanhadoresUltimo}
               saldoDisponivelSaque={saldoDisponivelSaque}
               onIrParaFinanceiro={() => setActiveTab("financeiro")}
+              onDispararCelebracao={dispararCelebracao}
             />
           )}
 
@@ -451,6 +500,14 @@ export default function Home() {
           setModalGanhadoresAberto(false);
           setActiveTab("financeiro");
         }}
+        onDispararCelebracao={dispararCelebracao}
+      />
+
+      {/* Celebração de Vitória (Sinal sonoro de 5s, balões de festas e UHUUUU GANHAMOS!!!!) */}
+      <CelebracaoVitoria
+        ativo={celebracaoAtiva}
+        onFinalizar={() => setCelebracaoAtiva(false)}
+        dados={celebracaoDados}
       />
 
       {/* Footer */}

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { X, Trophy, MapPin, Users, DollarSign, Calendar, History, Trash2, CheckCircle2, AlertCircle, Sparkles, Wallet } from "lucide-react";
 import { ConcursoLotofacil, HistoricoConsultaConcurso, JogoRegistrado } from "@/lib/types";
 import { saveHistoricoConsulta, getHistoricoConsultas, deleteHistoricoConsulta } from "@/lib/storage";
+import { DadosCelebracao } from "./CelebracaoVitoria";
 
 interface ModalGanhadoresProps {
   concurso: ConcursoLotofacil | null;
@@ -13,6 +14,7 @@ interface ModalGanhadoresProps {
   jogos?: JogoRegistrado[];
   saldoDisponivelSaque?: number;
   onIrParaFinanceiro?: () => void;
+  onDispararCelebracao?: (dados: DadosCelebracao) => void;
 }
 
 export default function ModalGanhadores({
@@ -23,6 +25,7 @@ export default function ModalGanhadores({
   jogos = [],
   saldoDisponivelSaque = 0,
   onIrParaFinanceiro,
+  onDispararCelebracao,
 }: ModalGanhadoresProps) {
   const [activeTab, setActiveTab] = useState<"detalhes" | "historico">("detalhes");
   const [historicoSalvo, setHistoricoSalvo] = useState<HistoricoConsultaConcurso[]>([]);
@@ -295,16 +298,36 @@ export default function ModalGanhadores({
                                 {valorGanho.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
                               </strong>
                             </div>
-                            {onIrParaFinanceiro && (
-                              <button
-                                type="button"
-                                onClick={onIrParaFinanceiro}
-                                className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto shadow-md shadow-emerald-900/40 active:scale-95"
-                              >
-                                <Wallet className="w-3.5 h-3.5" />
-                                <span>Registrar Saque deste Prêmio</span>
-                              </button>
-                            )}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {onDispararCelebracao && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    onDispararCelebracao({
+                                      acertos,
+                                      valorGanho,
+                                      concurso: concursoEmExibicao.numero,
+                                      grupoNome: jogo.grupoNome,
+                                      dezenasAcertadas: acertadas,
+                                    })
+                                  }
+                                  className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-black font-extrabold text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-md shadow-amber-500/30 active:scale-95"
+                                  title="Tocar sinal sonoro de 5 segundos e balões comemorativos"
+                                >
+                                  <span>🎉 UHUUUU GANHAMOS!</span>
+                                </button>
+                              )}
+                              {onIrParaFinanceiro && (
+                                <button
+                                  type="button"
+                                  onClick={onIrParaFinanceiro}
+                                  className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer self-start sm:self-auto shadow-md shadow-emerald-900/40 active:scale-95"
+                                >
+                                  <Wallet className="w-3.5 h-3.5" />
+                                  <span>Registrar Saque</span>
+                                </button>
+                              )}
+                            </div>
                           </div>
                         )}
 

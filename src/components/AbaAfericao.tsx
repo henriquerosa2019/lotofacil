@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { JogoRegistrado, ConcursoLotofacil, GrupoDezenas } from "@/lib/types";
 import { PREMIOS_FIXOS, GRUPOS_PADRAO, VALOR_APOSTA_15, apurarJogoComConcurso } from "@/lib/lotofacil-engine";
 import { saveJogoRegistrado, deleteJogoRegistrado, undoUltimoJogo } from "@/lib/storage";
+import { DadosCelebracao } from "./CelebracaoVitoria";
 import VolanteGrid from "./VolanteGrid";
 import {
   CheckCircle2,
@@ -36,6 +37,7 @@ interface AbaAfericaoProps {
   onVerResultado?: (concursoNum?: number) => void;
   saldoDisponivelSaque?: number;
   onIrParaFinanceiro?: () => void;
+  onDispararCelebracao?: (dados: DadosCelebracao) => void;
 }
 
 interface CruzamentoVisual {
@@ -60,6 +62,7 @@ export default function AbaAfericao({
   onVerResultado,
   saldoDisponivelSaque = 0,
   onIrParaFinanceiro,
+  onDispararCelebracao,
 }: AbaAfericaoProps) {
   const [aferindoId, setAferindoId] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<{ tipo: "sucesso" | "info" | "erro"; texto: string } | null>(null);
@@ -265,6 +268,18 @@ export default function AbaAfericao({
           faixaPremio: apMaisRecente.faixaPremio || "Não premiado",
           valorGanho: apMaisRecente.valorGanho,
         });
+
+        // Caso as dezenas tenham sido sorteadas (11, 12, 13, 14 ou 15 acertos):
+        // Dispara o sinal sonoro de 5 segundos, balões de festas, emojis e "UHUUUU GANHAMOS!!!!"
+        if (apMaisRecente.acertos >= 11 && onDispararCelebracao) {
+          onDispararCelebracao({
+            acertos: apMaisRecente.acertos,
+            valorGanho: apMaisRecente.valorGanho,
+            concurso: apMaisRecente.concurso,
+            grupoNome: jogoAtualizado.grupoNome,
+            dezenasAcertadas: apMaisRecente.dezenasAcertadas,
+          });
+        }
       }
 
       if (houveAlgumaApuracao) {
@@ -608,6 +623,47 @@ export default function AbaAfericao({
               </div>
             </div>
           </div>
+
+          {/* Banner de Celebração se o bilhete foi premiado */}
+          {cruzamentoAtivo.acertos >= 11 && (
+            <div className="p-3.5 sm:p-4 rounded-xl bg-gradient-to-r from-amber-500/25 via-yellow-500/15 to-emerald-500/20 border-2 border-amber-400/60 shadow-lg shadow-amber-500/10 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in">
+              <div className="flex items-center gap-3 text-center sm:text-left">
+                <span className="text-3xl animate-bounce">🥳</span>
+                <div>
+                  <h4 className="text-amber-300 font-black text-sm sm:text-base tracking-wide flex items-center gap-2 justify-center sm:justify-start">
+                    <span>UHUUUU GANHAMOS!!!!</span>
+                    <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-amber-400 text-black">
+                      {cruzamentoAtivo.acertos} ACERTOS!
+                    </span>
+                  </h4>
+                  <p className="text-xs text-gray-300 mt-0.5">
+                    Suas dezenas foram sorteadas! Prêmio de{" "}
+                    <strong className="text-emerald-400 font-mono">
+                      {cruzamentoAtivo.valorGanho.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                    </strong>{" "}
+                    acumulado no saldo da conta.
+                  </p>
+                </div>
+              </div>
+              {onDispararCelebracao && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onDispararCelebracao({
+                      acertos: cruzamentoAtivo.acertos,
+                      valorGanho: cruzamentoAtivo.valorGanho,
+                      concurso: cruzamentoAtivo.concurso,
+                      grupoNome: cruzamentoAtivo.grupoNome,
+                      dezenasAcertadas: cruzamentoAtivo.dezenasAcertadas,
+                    })
+                  }
+                  className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-400 hover:from-amber-300 hover:to-yellow-300 text-black font-black text-xs uppercase tracking-wider shadow-md shadow-amber-500/30 transition-all cursor-pointer flex items-center gap-1.5 shrink-0 hover:scale-105 active:scale-95"
+                >
+                  <span>🎉 Tocar Alarme & Comemorar (5s)</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Volante Visual de Dezenas Sorteadas vs Acertadas */}
           <div className="space-y-2 pt-1">
