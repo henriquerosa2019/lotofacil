@@ -1,8 +1,9 @@
 "use client";
 
 import React from "react";
-import { Sparkles, RefreshCw, Trophy, Wallet, ArrowDownCircle } from "lucide-react";
+import { Sparkles, RefreshCw, Trophy, Wallet, ArrowDownCircle, Clock, CheckCircle2, AlertCircle } from "lucide-react";
 import { ConcursoLotofacil } from "@/lib/types";
+import { StatusApuracaoCaixa } from "@/lib/caixa-monitor";
 
 interface HeaderProps {
   ultimoConcurso: ConcursoLotofacil | null;
@@ -14,6 +15,7 @@ interface HeaderProps {
   saldoDisponivelSaque?: number;
   onOpenGanhadores: (concursoNum?: number) => void;
   onIrParaFinanceiro?: () => void;
+  statusCaixa?: StatusApuracaoCaixa;
 }
 
 export default function Header({
@@ -26,6 +28,7 @@ export default function Header({
   saldoDisponivelSaque = 0,
   onOpenGanhadores,
   onIrParaFinanceiro,
+  statusCaixa,
 }: HeaderProps) {
   const [concursoInput, setConcursoInput] = React.useState<string>("");
   const saldoLiquido = totalGanhos - totalInvestido;
@@ -55,16 +58,37 @@ export default function Header({
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-purple-400 via-fuchsia-300 to-white bg-clip-text text-transparent">
                 Lotofácil AI & Monitor
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                Online
-              </span>
+              {statusCaixa ? (
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border flex items-center gap-1.5 transition-all ${statusCaixa.badgeClasse}`}
+                  title={`${statusCaixa.mensagem} • ${statusCaixa.dicaHorario}`}
+                >
+                  {statusCaixa.badgeIcone === "spin" && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-ping" />
+                  )}
+                  {statusCaixa.badgeIcone === "check" && (
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                  )}
+                  {statusCaixa.badgeIcone === "clock" && (
+                    <Clock className="w-3 h-3 text-purple-300" />
+                  )}
+                  <span>{statusCaixa.badgeTexto}</span>
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Online
+                </span>
+              )}
             </div>
-            <p className="text-xs text-gray-400">
-              Análise probabilística, grupos ranqueados por IA e aferição oficial Caixa
+            <p className="text-xs text-gray-400 flex items-center gap-1.5 flex-wrap">
+              <span>Análise probabilística & aferição oficial Caixa.</span>
+              <span className="text-[11px] text-purple-300/80 hidden sm:inline">
+                Sorteios: Seg a Sáb às 20h • Apuração oficial a partir das 21h
+              </span>
             </p>
           </div>
         </div>

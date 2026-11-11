@@ -43,7 +43,7 @@ export default function AbaEstatisticas({
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
   const [ultimoJogoId, setUltimoJogoId] = useState<string | null>(null);
 
-  const concursoAtual = ultimoConcurso?.numero || 3760;
+  const concursoAtual = ultimoConcurso?.numero || (historico.length > 0 ? historico[historico.length - 1].numero : 3826);
   const proximoConcurso = concursoAtual + 1;
 
   // GERAÇÃO DINÂMICA DAS 3 MELHORES QUINZENAS CONFORME A JANELA ESCOLHIDA (10, 20, 50, etc.)

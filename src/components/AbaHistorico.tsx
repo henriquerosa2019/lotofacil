@@ -65,23 +65,26 @@ export default function AbaHistorico({
   }, [jogos]);
 
   // Último concurso apurado pela Caixa
-  const ultimoNumeroApurado = ultimoConcurso?.numero || 3824;
+  const ultimoNumeroApurado = ultimoConcurso?.numero || (historico.length > 0 ? historico[historico.length - 1].numero : 3826);
 
   // 1. CONCURSOS DO USUÁRIO JÁ APURADOS PELA CAIXA (do menor concurso jogado >= 3820 até o último apurado)
   const concursosApuradosUsuario = useMemo(() => {
-    // Lista unificada da base histórica + último concurso da Caixa
-    const todos = [...historico];
-    if (ultimoConcurso && !todos.some((c) => c.numero === ultimoConcurso.numero)) {
-      todos.push(ultimoConcurso);
+    // Lista unificada e deduplicada da base histórica + último concurso da Caixa
+    const mapTodos = new Map<number, ConcursoLotofacil>();
+    historico.forEach((c) => mapTodos.set(c.numero, c));
+    if (ultimoConcurso) {
+      mapTodos.set(ultimoConcurso.numero, ultimoConcurso);
     }
+    const todos = Array.from(mapTodos.values());
 
     // REGRA RESTRITA: Mostra APENAS concursos a partir do início da teimosinha (>= 3820) que o usuário jogou
     const filtrados = todos.filter((c) => {
       if (c.numero < menorConcursoJogado) return false;
+      if (concursosDoUsuarioMap.size === 0) return c.numero >= 3820;
       return concursosDoUsuarioMap.has(c.numero);
     });
 
-    // Ordena do mais recente para o mais antigo (3824, 3823, 3822, 3821, 3820)
+    // Ordena do mais recente para o mais antigo (ex: 3826, 3825, 3824, 3823, 3822, 3821, 3820)
     filtrados.sort((a, b) => b.numero - a.numero);
 
     return filtrados;

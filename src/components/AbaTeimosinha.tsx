@@ -22,7 +22,7 @@ export default function AbaTeimosinha({
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
   const [ultimosRegistradosIds, setUltimosRegistradosIds] = useState<string[]>([]);
 
-  const concursoAtual = ultimoConcurso?.numero || 3760;
+  const concursoAtual = ultimoConcurso?.numero || 3826;
   const proximoConcurso = concursoAtual + 1;
 
   const opcoesTeimosinha = [

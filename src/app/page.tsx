@@ -1,8 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { ConcursoLotofacil, JogoRegistrado, RegistroSaque } from "@/lib/types";
-import { getJogosRegistrados, getSaquesRegistrados, saveJogoRegistrado, saveHistoricoConsulta } from "@/lib/storage";
+import {
+  getJogosRegistrados,
+  getSaquesRegistrados,
+  saveJogoRegistrado,
+  saveHistoricoConsulta,
+  reconciliarJogosComConcursos,
+} from "@/lib/storage";
+import {
+  getStatusApuracaoCaixa,
+  preencherLacunasConcursos,
+  StatusApuracaoCaixa,
+} from "@/lib/caixa-monitor";
 import { apurarJogoComConcurso, gerarMelhoresQuinzenas } from "@/lib/lotofacil-engine";
 import historicalSeed from "@/lib/historical-seed.json";
 import Header from "@/components/Header";
@@ -23,6 +34,11 @@ export default function Home() {
   const [ultimoConcurso, setUltimoConcurso] = useState<ConcursoLotofacil | null>(null);
   const [loadingApi, setLoadingApi] = useState<boolean>(false);
 
+  // Status de apuração e sorteios da Caixa (atualizado em tempo real e a partir das 21h)
+  const [statusCaixa, setStatusCaixa] = useState<StatusApuracaoCaixa>(() =>
+    getStatusApuracaoCaixa(null)
+  );
+
   const [jogos, setJogos] = useState<JogoRegistrado[]>([]);
   const [saques, setSaques] = useState<RegistroSaque[]>([]);
 
@@ -30,28 +46,50 @@ export default function Home() {
   const [modalGanhadoresConcurso, setModalGanhadoresConcurso] = useState<ConcursoLotofacil | null>(null);
   const [modalGanhadoresAberto, setModalGanhadoresAberto] = useState<boolean>(false);
 
-  // Carrega dados iniciais do LocalStorage e busca API Caixa
-  const carregarDadosLocais = () => {
+  // Carrega dados iniciais do LocalStorage
+  const carregarDadosLocais = useCallback(() => {
     setJogos(getJogosRegistrados());
     setSaques(getSaquesRegistrados());
-  };
+  }, []);
 
-  const buscarDadosCaixa = async (): Promise<ConcursoLotofacil | null> => {
+  /**
+   * Busca dados em tempo real da Caixa Econômica Federal:
+   * 1. Elimina qualquer cache (cache: "no-store", ?t=Date.now()).
+   * 2. Preenche sequencialmente qualquer lacuna de concursos (gap-filling),
+   *    garantindo que se a Caixa estiver no 3826 (ou 3827), o concurso 3825 seja
+   *    imediatamente integrado sem nunca ser pulado.
+   * 3. Registra as consultas no histórico local.
+   * 4. Reconcilia e apura todos os bilhetes do usuário (teimosinhas), acumulando saldo.
+   */
+  const buscarDadosCaixa = useCallback(async (): Promise<ConcursoLotofacil | null> => {
     setLoadingApi(true);
     try {
-      const res = await fetch("/api/lotofacil");
+      const res = await fetch("/api/lotofacil?t=" + Date.now(), { cache: "no-store" });
       if (res.ok) {
         const data = await res.json();
         if (data.sucesso && data.concurso) {
-          setUltimoConcurso(data.concurso);
-          setHistorico((prev) => {
-            const existe = prev.some((c) => c.numero === data.concurso.numero);
-            if (!existe) {
-              return [...prev, data.concurso];
-            }
-            return prev;
-          });
-          return data.concurso as ConcursoLotofacil;
+          const concCaixa: ConcursoLotofacil = data.concurso;
+          setUltimoConcurso(concCaixa);
+          saveHistoricoConsulta(concCaixa);
+
+          // Preenche sequencialmente qualquer concurso faltante (ex: 3825, 3826)
+          const { novoHistorico, concursosAdicionados } = await preencherLacunasConcursos(
+            historico,
+            concCaixa
+          );
+
+          concursosAdicionados.forEach((c) => saveHistoricoConsulta(c));
+          setHistorico(novoHistorico);
+
+          // Reconcilia todos os jogos salvos com os concursos apurados
+          const houveReconciliacao = reconciliarJogosComConcursos(novoHistorico);
+          if (houveReconciliacao || concursosAdicionados.length > 0) {
+            carregarDadosLocais();
+          }
+
+          // Atualiza status oficial da Caixa
+          setStatusCaixa(getStatusApuracaoCaixa(concCaixa));
+          return concCaixa;
         }
       }
     } catch (err) {
@@ -60,12 +98,59 @@ export default function Home() {
       setLoadingApi(false);
     }
     return null;
-  };
+  }, [historico, carregarDadosLocais]);
 
+  // Carga inicial
   useEffect(() => {
     carregarDadosLocais();
     buscarDadosCaixa();
   }, []);
+
+  // Atualiza relógio e status do sorteio Caixa a cada 10 segundos
+  useEffect(() => {
+    const timerStatus = setInterval(() => {
+      setStatusCaixa(getStatusApuracaoCaixa(ultimoConcurso));
+    }, 10000);
+    return () => clearInterval(timerStatus);
+  }, [ultimoConcurso]);
+
+  /**
+   * Monitoramento contínuo da apuração oficial da Caixa a partir das 21h:
+   * - Seg a Sáb entre 20h45 e 23h59: dispara busca a cada 30 segundos enquanto o concurso do dia não for obtido.
+   * - Fora do horário: verifica a cada 3 minutos.
+   * - Dispara busca imediatamente quando a aba do navegador for reaberta ou ganhar foco.
+   */
+  useEffect(() => {
+    const checarESincronizar = () => {
+      const st = getStatusApuracaoCaixa(ultimoConcurso);
+      setStatusCaixa(st);
+
+      // Se estiver no horário de apuração da Caixa e o concurso de hoje ainda não tiver sido capturado
+      if (st.horarioApuracaoAtivo && !st.concursoHojeApurado) {
+        buscarDadosCaixa();
+      }
+    };
+
+    const stAtual = getStatusApuracaoCaixa(ultimoConcurso);
+    const intervaloMs = stAtual.horarioApuracaoAtivo ? 30000 : 180000;
+
+    const intervalId = setInterval(checarESincronizar, intervaloMs);
+
+    const handleVisibilidade = () => {
+      if (document.visibilityState === "visible") {
+        checarESincronizar();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilidade);
+    window.addEventListener("focus", handleVisibilidade);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilidade);
+      window.removeEventListener("focus", handleVisibilidade);
+    };
+  }, [ultimoConcurso, buscarDadosCaixa]);
 
   // Cálculos financeiros consolidados
   const totalInvestido = jogos.reduce((acc, j) => acc + j.custoTotal, 0);
@@ -75,7 +160,7 @@ export default function Home() {
 
   // Quantidade de concursos jogados pelo usuário que já foram apurados
   const concursosJogadosApuradosCount = useMemo(() => {
-    const ultimoNum = ultimoConcurso?.numero || 3824;
+    const ultimoNum = ultimoConcurso?.numero || (historico.length > 0 ? historico[historico.length - 1].numero : 3826);
     const concursosSet = new Set<number>();
     jogos.forEach((j) => {
       const fim = Math.min(j.concursoFinal, ultimoNum);
@@ -220,6 +305,7 @@ export default function Home() {
         saldoDisponivelSaque={saldoDisponivelSaque}
         onOpenGanhadores={handleAbrirGanhadoresUltimo}
         onIrParaFinanceiro={() => setActiveTab("financeiro")}
+        statusCaixa={statusCaixa}
       />
 
       {/* Main Container */}

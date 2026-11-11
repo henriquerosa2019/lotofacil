@@ -83579,5 +83579,153 @@
         "uf": "BA"
       }
     ]
+  },
+  {
+    "numero": 3825,
+    "dataApuracao": "09/11/2026",
+    "dezenas": [
+      1,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      14,
+      15,
+      17,
+      19,
+      20,
+      23
+    ],
+    "acumulado": false,
+    "valorArrecadado": 20823358.5,
+    "valorEstimadoProximoConcurso": 2000000,
+    "listaRateioPremio": [
+      {
+        "descricaoFaixa": "15 acertos",
+        "faixa": 1,
+        "numeroDeGanhadores": 1,
+        "valorPremio": 1622768.4
+      },
+      {
+        "descricaoFaixa": "14 acertos",
+        "faixa": 2,
+        "numeroDeGanhadores": 177,
+        "valorPremio": 1922.36
+      },
+      {
+        "descricaoFaixa": "13 acertos",
+        "faixa": 3,
+        "numeroDeGanhadores": 7042,
+        "valorPremio": 35
+      },
+      {
+        "descricaoFaixa": "12 acertos",
+        "faixa": 4,
+        "numeroDeGanhadores": 94959,
+        "valorPremio": 14
+      },
+      {
+        "descricaoFaixa": "11 acertos",
+        "faixa": 5,
+        "numeroDeGanhadores": 543365,
+        "valorPremio": 7
+      }
+    ],
+    "listaMunicipioUFGanhadores": [
+      {
+        "ganhadores": 1,
+        "municipio": "FRANCISCO BELTRAO",
+        "nomeFatansiaUL": "",
+        "posicao": 1,
+        "serie": "",
+        "uf": "PR"
+      }
+    ]
+  },
+  {
+    "numero": 3826,
+    "dataApuracao": "10/11/2026",
+    "dezenas": [
+      1,
+      2,
+      3,
+      5,
+      8,
+      9,
+      12,
+      13,
+      15,
+      18,
+      19,
+      21,
+      22,
+      24,
+      25
+    ],
+    "acumulado": false,
+    "valorArrecadado": 20310076.5,
+    "valorEstimadoProximoConcurso": 2000000,
+    "listaRateioPremio": [
+      {
+        "descricaoFaixa": "15 acertos",
+        "faixa": 1,
+        "numeroDeGanhadores": 3,
+        "valorPremio": 408185.03
+      },
+      {
+        "descricaoFaixa": "14 acertos",
+        "faixa": 2,
+        "numeroDeGanhadores": 355,
+        "valorPremio": 1033.24
+      },
+      {
+        "descricaoFaixa": "13 acertos",
+        "faixa": 3,
+        "numeroDeGanhadores": 11132,
+        "valorPremio": 35
+      },
+      {
+        "descricaoFaixa": "12 acertos",
+        "faixa": 4,
+        "numeroDeGanhadores": 118233,
+        "valorPremio": 14
+      },
+      {
+        "descricaoFaixa": "11 acertos",
+        "faixa": 5,
+        "numeroDeGanhadores": 575335,
+        "valorPremio": 7
+      }
+    ],
+    "listaMunicipioUFGanhadores": [
+      {
+        "ganhadores": 1,
+        "municipio": "CANAL ELETRONICO",
+        "nomeFatansiaUL": "",
+        "posicao": 1,
+        "serie": "",
+        "uf": "--"
+      },
+      {
+        "ganhadores": 1,
+        "municipio": "RIO DE JANEIRO",
+        "nomeFatansiaUL": "",
+        "posicao": 1,
+        "serie": "",
+        "uf": "RJ"
+      },
+      {
+        "ganhadores": 1,
+        "municipio": "SAO PAULO",
+        "nomeFatansiaUL": "",
+        "posicao": 1,
+        "serie": "",
+        "uf": "SP"
+      }
+    ]
   }
 ]

@@ -150,9 +150,9 @@ export function getHistoricoConsultas(): HistoricoConsultaConcurso[] {
     const raw = localStorage.getItem(KEY_HISTORICO_CONSULTAS);
     let list: HistoricoConsultaConcurso[] = raw ? JSON.parse(raw) : [];
 
-    // Garante que os concursos recentes (como 3824, 3823, 3822, 3821, 3820) estejam sempre no histórico
+    // Garante que os concursos recentes (como 3826, 3825, 3824, 3823, 3822, 3821, 3820) estejam sempre no histórico
     const seedArray = historicalSeed as ConcursoLotofacil[];
-    const concursosChave = [3824, 3823, 3822, 3821, 3820];
+    const concursosChave = [3826, 3825, 3824, 3823, 3822, 3821, 3820];
     let houveInclusao = false;
 
     concursosChave.forEach((num) => {
@@ -274,3 +274,74 @@ export function clearHistoricoConsultas(): void {
   if (typeof window === "undefined") return;
   localStorage.removeItem(KEY_HISTORICO_CONSULTAS);
 }
+
+// Reconcilia e apura qualquer concurso faltante (como 3825, 3826) em todos os jogos cadastrados
+export function reconciliarJogosComConcursos(concursos: ConcursoLotofacil[]): boolean {
+  if (typeof window === "undefined") return false;
+  const jogos = getJogosRegistrados();
+  let houveModificacao = false;
+
+  const jogosAtualizados = jogos.map((j) => {
+    let jogoModificado = false;
+    const copiaApuracoes = { ...j.apuracoes };
+
+    concursos.forEach((c) => {
+      // Se o concurso está na vigência do jogo e ainda não consta apurado
+      if (
+        c.numero >= j.concursoInicial &&
+        c.numero <= j.concursoFinal &&
+        !copiaApuracoes[c.numero]
+      ) {
+        const sortSetConc = new Set(c.dezenas);
+        const acertadas = j.dezenas.filter((d) => sortSetConc.has(d));
+        const acertos = acertadas.length;
+        let valorGanho = 0;
+        let faixaPremio = "Não premiado";
+
+        if (acertos === 15) {
+          const f = c.listaRateioPremio?.find((r) => r.faixa === 1);
+          valorGanho = f?.valorPremio || 2000000.0;
+          faixaPremio = "15 ACERTOS (PRÊMIO MÁXIMO!)";
+        } else if (acertos === 14) {
+          const f = c.listaRateioPremio?.find((r) => r.faixa === 2);
+          valorGanho = f?.valorPremio || 1500.0;
+          faixaPremio = "14 Acertos";
+        } else if (acertos === 13) valorGanho = 35.0;
+        else if (acertos === 12) valorGanho = 14.0;
+        else if (acertos === 11) valorGanho = 7.0;
+
+        copiaApuracoes[c.numero] = {
+          concurso: c.numero,
+          data: c.dataApuracao,
+          dezenasSorteadas: c.dezenas,
+          acertos,
+          dezenasAcertadas: acertadas,
+          faixaPremio,
+          valorGanho,
+          apuradoEm: "Oficial Caixa",
+        };
+        jogoModificado = true;
+      }
+    });
+
+    if (jogoModificado) {
+      const totalGanho = Object.values(copiaApuracoes).reduce(
+        (acc, a) => acc + a.valorGanho,
+        0
+      );
+      houveModificacao = true;
+      return {
+        ...j,
+        apuracoes: copiaApuracoes,
+        totalGanho,
+      };
+    }
+    return j;
+  });
+
+  if (houveModificacao) {
+    localStorage.setItem(KEY_JOGOS, JSON.stringify(jogosAtualizados));
+  }
+  return houveModificacao;
+}
+

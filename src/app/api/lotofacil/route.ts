@@ -11,32 +11,42 @@ export async function GET() {
   };
 
   try {
-    // 1. Tenta API oficial da Caixa
+    // 1. Tenta API oficial da Caixa sem nenhum cache (tempo real)
     const res = await fetch(
       "https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/",
       {
         headers,
-        next: { revalidate: 60 },
+        cache: "no-store",
       }
     );
 
     if (res.ok) {
       const data = await res.json();
       const dezenas = (data.listaDezenas || []).map((d: string) => parseInt(d, 10));
-      return NextResponse.json({
-        sucesso: true,
-        origem: "oficial_caixa",
-        concurso: {
-          numero: data.numero,
-          dataApuracao: data.dataApuracao,
-          dezenas,
-          acumulado: data.acumulado,
-          valorArrecadado: data.valorArrecadado,
-          valorEstimadoProximoConcurso: data.valorEstimadoProximoConcurso,
-          listaRateioPremio: data.listaRateioPremio || [],
-          listaMunicipioUFGanhadores: data.listaMunicipioUFGanhadores || [],
+      return NextResponse.json(
+        {
+          sucesso: true,
+          origem: "oficial_caixa",
+          consultadoEm: new Date().toISOString(),
+          concurso: {
+            numero: data.numero,
+            dataApuracao: data.dataApuracao,
+            dezenas,
+            acumulado: data.acumulado,
+            valorArrecadado: data.valorArrecadado,
+            valorEstimadoProximoConcurso: data.valorEstimadoProximoConcurso,
+            listaRateioPremio: data.listaRateioPremio || [],
+            listaMunicipioUFGanhadores: data.listaMunicipioUFGanhadores || [],
+          },
         },
-      });
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+            Pragma: "no-cache",
+            Expires: "0",
+          },
+        }
+      );
     }
   } catch (err) {
     console.error("Erro ao consultar Caixa, tentando fallback:", err);
@@ -46,7 +56,7 @@ export async function GET() {
   try {
     const res2 = await fetch(
       "https://loteriascaixa-api.herokuapp.com/api/lotofacil/latest",
-      { headers, next: { revalidate: 60 } }
+      { headers, cache: "no-store" }
     );
     if (res2.ok) {
       const d2 = await res2.json();

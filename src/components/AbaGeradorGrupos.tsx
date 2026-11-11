@@ -34,7 +34,7 @@ export default function AbaGeradorGrupos({
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
   const [ultimoJogoId, setUltimoJogoId] = useState<string | null>(null);
 
-  const concursoAtual = ultimoConcurso?.numero || 3760;
+  const concursoAtual = ultimoConcurso?.numero || 3826;
   const proximoConcurso = concursoAtual + 1;
 
   const handleRegistrarAposta = (grupo: GrupoDezenas) => {
