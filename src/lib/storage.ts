@@ -5,31 +5,34 @@ const KEY_JOGOS = "lotofacil_jogos_registrados";
 const KEY_SAQUES = "lotofacil_saques_registrados";
 const KEY_HISTORICO_CONSULTAS = "lotofacil_historico_consultas";
 
-// Cria e apura a Teimosinha oficial do usuário iniciada no Concurso 3820
+// Cria e apura a Teimosinha oficial do usuário com o GRUPO 2 iniciada no Concurso 3820
 export function criarTeimosinhaPadrao3820(): JogoRegistrado {
-  // 15 dezenas equilibradas da Teimosinha
-  const dezenasTeimosinha = [1, 2, 3, 5, 6, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24];
+  // Grupo 02 — Retorno Cíclico & Pressão de Frias (15 dezenas oficiais)
+  const dezenasGrupo2 = [1, 3, 4, 6, 7, 9, 11, 13, 14, 16, 18, 22, 23, 24, 25];
   const seedArray = historicalSeed as ConcursoLotofacil[];
   const apuracoes: JogoRegistrado["apuracoes"] = {};
   let totalGanho = 0;
 
-  // Apura os concursos já sorteados da Caixa a partir do 3820 (3820, 3821, 3822, 3823, 3824)
+  // Apura os concursos sorteados da Caixa da Teimosinha (3820 a 3843)
   const concursosParaApurar = seedArray.filter((c) => c.numero >= 3820 && c.numero <= 3843);
-  const sortSetUser = new Set(dezenasTeimosinha);
 
   concursosParaApurar.forEach((conc) => {
-    const sortSetConc = new Set(conc.dezenas);
-    const acertadas = dezenasTeimosinha.filter((d) => sortSetConc.has(d));
+    const dezenasOficiais = (conc.dezenas || (conc as any).listaDezenas || [])
+      .map((x: any) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+      .filter((n: number) => !isNaN(n));
+
+    const sortSetConc = new Set(dezenasOficiais);
+    const acertadas = dezenasGrupo2.filter((d) => sortSetConc.has(d));
     const acertos = acertadas.length;
     let valorGanho = 0;
     let faixaPremio = "Não premiado";
 
     if (acertos === 15) {
-      const f = conc.listaRateioPremio?.find((r) => r.faixa === 1);
+      const f = conc.listaRateioPremio?.find((r) => Number(r.faixa) === 1);
       valorGanho = f?.valorPremio || 2000000.0;
       faixaPremio = "15 ACERTOS (PRÊMIO MÁXIMO!)";
     } else if (acertos === 14) {
-      const f = conc.listaRateioPremio?.find((r) => r.faixa === 2);
+      const f = conc.listaRateioPremio?.find((r) => Number(r.faixa) === 2);
       valorGanho = f?.valorPremio || 1500.0;
       faixaPremio = "14 Acertos";
     } else if (acertos === 13) {
@@ -47,7 +50,7 @@ export function criarTeimosinhaPadrao3820(): JogoRegistrado {
     apuracoes[conc.numero] = {
       concurso: conc.numero,
       data: conc.dataApuracao,
-      dezenasSorteadas: conc.dezenas,
+      dezenasSorteadas: dezenasOficiais,
       acertos,
       dezenasAcertadas: acertadas,
       faixaPremio,
@@ -58,9 +61,9 @@ export function criarTeimosinhaPadrao3820(): JogoRegistrado {
 
   return {
     id: "teimosinha_3820_oficial",
-    grupoId: "grupo-1",
-    grupoNome: "Minha Teimosinha (Início C.3820)",
-    dezenas: dezenasTeimosinha,
+    grupoId: "grupo-2",
+    grupoNome: "Grupo 02 — Retorno Cíclico & Pressão de Frias (Minha Teimosinha C.3820)",
+    dezenas: dezenasGrupo2,
     concursoInicial: 3820,
     teimosinhaConcursos: 24,
     concursoFinal: 3843,
@@ -87,7 +90,61 @@ export function getJogosRegistrados(): JogoRegistrado[] {
       localStorage.setItem(KEY_JOGOS, JSON.stringify([jogoPadrao]));
       return [jogoPadrao];
     }
-    return parsed;
+
+    // CORREÇÃO E MIGRAÇÃO DEFINITIVA PARA O GRUPO 2:
+    // O usuário jogou oficialmente o Grupo 2 na Teimosinha iniciada no Concurso 3820.
+    // Qualquer jogo marcado anteriormente como Grupo 3, Grupo 1 ou teimosinha_3820_oficial
+    // é corrigido para o Grupo 02 com as 15 dezenas oficiais e apurações recalculadas.
+    const dezenasGrupo2 = [1, 3, 4, 6, 7, 9, 11, 13, 14, 16, 18, 22, 23, 24, 25];
+    let precisaSalvar = false;
+
+    const novosJogos: JogoRegistrado[] = [];
+    const gruposProcessados = new Set<string>();
+
+    for (const j of parsed) {
+      const isTeimosinha3820 = j.concursoInicial === 3820 || j.id === "teimosinha_3820_oficial";
+      const isGrupoIncorreto = j.grupoId === "grupo-3" || j.grupoId === "grupo-1" || (j.grupoNome && j.grupoNome.includes("Grupo 03"));
+
+      if (isTeimosinha3820 || isGrupoIncorreto) {
+        if (!gruposProcessados.has("grupo-2")) {
+          const novoPadrao = criarTeimosinhaPadrao3820();
+          novosJogos.push({
+            ...j,
+            id: j.id || "teimosinha_3820_oficial",
+            grupoId: "grupo-2",
+            grupoNome: "Grupo 02 — Retorno Cíclico & Pressão de Frias (Minha Teimosinha C.3820)",
+            dezenas: dezenasGrupo2,
+            concursoInicial: 3820,
+            concursoFinal: 3843,
+            teimosinhaConcursos: 24,
+            apuracoes: novoPadrao.apuracoes,
+            totalGanho: novoPadrao.totalGanho,
+          });
+          gruposProcessados.add("grupo-2");
+          precisaSalvar = true;
+        } else {
+          // Descarta duplicatas de grupos antigos
+          precisaSalvar = true;
+        }
+      } else {
+        if (!gruposProcessados.has(j.grupoId)) {
+          novosJogos.push(j);
+          gruposProcessados.add(j.grupoId);
+        }
+      }
+    }
+
+    if (novosJogos.length === 0) {
+      const jogoPadrao = criarTeimosinhaPadrao3820();
+      novosJogos.push(jogoPadrao);
+      precisaSalvar = true;
+    }
+
+    if (precisaSalvar) {
+      localStorage.setItem(KEY_JOGOS, JSON.stringify(novosJogos));
+    }
+
+    return novosJogos;
   } catch {
     return [criarTeimosinhaPadrao3820()];
   }

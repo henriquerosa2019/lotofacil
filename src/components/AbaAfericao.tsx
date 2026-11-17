@@ -92,7 +92,7 @@ export default function AbaAfericao({
   const [cruzamentoAtivo, setCruzamentoAtivo] = useState<CruzamentoVisual | null>(null);
 
   // Estados para Escolha do Jogo
-  const [opcaoSelecionada, setOpcaoSelecionada] = useState<string>("grupo-1");
+  const [opcaoSelecionada, setOpcaoSelecionada] = useState<string>("grupo-2");
   const [minhasDezenas, setMinhasDezenas] = useState<number[]>([]);
   const [teimosinhaQtd, setTeimosinhaQtd] = useState<number>(1);
 

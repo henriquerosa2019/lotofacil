@@ -29,7 +29,7 @@ export default function AbaGeradorGrupos({
   onIrParaAfericao,
 }: AbaGeradorGruposProps) {
   const [grupos] = useState<GrupoDezenas[]>(GRUPOS_PADRAO);
-  const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string>("grupo-1");
+  const [grupoSelecionadoId, setGrupoSelecionadoId] = useState<string>("grupo-2");
   const [teimosinhaQtd, setTeimosinhaQtd] = useState<number>(24);
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
   const [ultimoJogoId, setUltimoJogoId] = useState<string | null>(null);

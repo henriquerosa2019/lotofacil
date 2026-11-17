@@ -17,7 +17,7 @@ export default function AbaTeimosinha({
   onJogoRegistrado,
   onIrParaAfericao,
 }: AbaTeimosinhaProps) {
-  const [jogosSelecionados, setJogosSelecionados] = useState<number>(3); // 1, 2 ou 3 jogos
+  const [jogosSelecionados, setJogosSelecionados] = useState<number>(1); // 1, 2 ou 3 jogos
   const [teimosinhaOpcao, setTeimosinhaOpcao] = useState<number>(24);
   const [sucessoMsg, setSucessoMsg] = useState<string | null>(null);
   const [ultimosRegistradosIds, setUltimosRegistradosIds] = useState<string[]>([]);
@@ -37,7 +37,9 @@ export default function AbaTeimosinha({
   const custoTotal = jogosSelecionados * teimosinhaOpcao * VALOR_APOSTA_15;
 
   const handleRegistrarCombo = () => {
-    const gruposParaRegistrar = GRUPOS_PADRAO.slice(0, jogosSelecionados);
+    const grupo2 = GRUPOS_PADRAO.find((g) => g.id === "grupo-2") || GRUPOS_PADRAO[1] || GRUPOS_PADRAO[0];
+    const gruposParaRegistrar =
+      jogosSelecionados === 1 ? [grupo2] : GRUPOS_PADRAO.slice(0, jogosSelecionados);
     const novosIds: string[] = [];
     gruposParaRegistrar.forEach((g) => {
       const custo = teimosinhaOpcao * VALOR_APOSTA_15;

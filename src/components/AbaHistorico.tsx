@@ -344,7 +344,10 @@ export default function AbaHistorico({
                 0
               );
 
-              const sortSetCaixa = new Set(conc.dezenas);
+              const dezenasOficiais = (conc.dezenas || (conc as any).listaDezenas || [])
+                .map((x: any) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+                .filter((n: number) => !isNaN(n));
+              const sortSetCaixa = new Set(dezenasOficiais);
 
               return (
                 <div
@@ -393,7 +396,10 @@ export default function AbaHistorico({
                   {/* SEÇÃO PRINCIPAL: SUAS APOSTAS DA TEIMOSINHA NESTE CONCURSO */}
                   <div className="space-y-3">
                     {jogosDesteConcurso.map((jogo) => {
-                      const acertadas = jogo.dezenas.filter((d) => sortSetCaixa.has(d));
+                      const jogoDezenas = (jogo.dezenas || [])
+                        .map((x: any) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+                        .filter((n: number) => !isNaN(n));
+                      const acertadas = jogoDezenas.filter((d) => sortSetCaixa.has(d));
                       const acertos = acertadas.length;
                       const isPremiado = acertos >= 11;
 
@@ -403,7 +409,7 @@ export default function AbaHistorico({
                         valorGanho = valor15 > 0 ? valor15 : 2000000;
                         textoFaixa = "15 ACERTOS (PRÊMIO MÁXIMO!)";
                       } else if (acertos === 14) {
-                        const f14 = conc.listaRateioPremio?.find((f) => f.faixa === 2);
+                        const f14 = conc.listaRateioPremio?.find((f) => Number(f.faixa) === 2);
                         valorGanho = f14?.valorPremio || 1500;
                         textoFaixa = "14 Acertos";
                       } else if (acertos === 13) {
