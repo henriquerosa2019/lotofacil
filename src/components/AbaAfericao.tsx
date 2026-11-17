@@ -95,9 +95,20 @@ export default function AbaAfericao({
   const [teimosinhaQtd, setTeimosinhaQtd] = useState<number>(1);
 
   // Concurso sugerido pela IA (último concurso oficial + 1)
-  const concursoUltimoNumero = ultimoConcurso?.numero || 3826;
+  const concursoUltimoNumero = ultimoConcurso?.numero || 3831;
   const concursoSugerido = concursoUltimoNumero + 1;
   const [concursoJogo, setConcursoJogo] = useState<number>(concursoSugerido);
+
+  // Lista dinâmica de atalhos rápidos do último concurso apurado até o início da teimosinha (3820)
+  const atalhosConcursos = React.useMemo(() => {
+    const max = Math.max(ultimoConcurso?.numero || 3831, 3831);
+    const min = 3820;
+    const lista: number[] = [];
+    for (let c = max; c >= min; c--) {
+      lista.push(c);
+    }
+    return lista;
+  }, [ultimoConcurso?.numero]);
 
   // Atualiza concurso sugerido se o último concurso carregar
   useEffect(() => {
@@ -740,7 +751,7 @@ export default function AbaAfericao({
           <div className="relative flex-1">
             <input
               type="number"
-              placeholder={ultimoConcurso ? `Digite o concurso (ex: 3820, 3822, 3823, ${ultimoConcurso.numero})...` : "Digite o concurso..."}
+              placeholder={ultimoConcurso ? `Digite o concurso (ex: 3820, 3830, ${ultimoConcurso.numero})...` : "Digite o concurso (ex: 3830)..."}
               value={concursoParaAferir}
               onChange={(e) => setConcursoParaAferir(e.target.value)}
               onKeyDown={(e) => {
@@ -773,7 +784,7 @@ export default function AbaAfericao({
               title="Aferir o último concurso apurado pela Caixa Econômica Federal"
             >
               <Trophy className="w-3.5 h-3.5" />
-              <span>Último ({ultimoConcurso?.numero || 3826})</span>
+              <span>Último ({ultimoConcurso?.numero || 3831})</span>
             </button>
           </div>
         </div>
@@ -781,7 +792,7 @@ export default function AbaAfericao({
         {/* Atalhos Rápidos para Concursos Recentes */}
         <div className="flex flex-wrap items-center gap-1.5 pt-1">
           <span className="text-[11px] text-gray-400 font-medium mr-1">Atalhos rápidos:</span>
-          {[3826, 3825, 3824, 3823, 3822, 3821, 3820].map((num) => (
+          {atalhosConcursos.map((num) => (
             <button
               key={num}
               type="button"

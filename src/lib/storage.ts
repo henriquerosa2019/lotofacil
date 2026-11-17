@@ -150,9 +150,9 @@ export function getHistoricoConsultas(): HistoricoConsultaConcurso[] {
     const raw = localStorage.getItem(KEY_HISTORICO_CONSULTAS);
     let list: HistoricoConsultaConcurso[] = raw ? JSON.parse(raw) : [];
 
-    // Garante que os concursos recentes (como 3826, 3825, 3824, 3823, 3822, 3821, 3820) estejam sempre no histórico
+    // Garante que os concursos recentes (como 3831, 3830, 3829, 3828, 3827, 3826, 3825, 3824, 3823, 3822, 3821, 3820) estejam sempre no histórico
     const seedArray = historicalSeed as ConcursoLotofacil[];
-    const concursosChave = [3826, 3825, 3824, 3823, 3822, 3821, 3820];
+    const concursosChave = [3831, 3830, 3829, 3828, 3827, 3826, 3825, 3824, 3823, 3822, 3821, 3820];
     let houveInclusao = false;
 
     concursosChave.forEach((num) => {
@@ -286,13 +286,18 @@ export function reconciliarJogosComConcursos(concursos: ConcursoLotofacil[]): bo
     const copiaApuracoes = { ...j.apuracoes };
 
     concursos.forEach((c) => {
-      // Se o concurso está na vigência do jogo e ainda não consta apurado
+      const apExistente = copiaApuracoes[c.numero];
+      const precisaApurar = !apExistente || !apExistente.dezenasSorteadas || apExistente.dezenasSorteadas.length === 0;
+
       if (
         c.numero >= j.concursoInicial &&
         c.numero <= j.concursoFinal &&
-        !copiaApuracoes[c.numero]
+        precisaApurar
       ) {
-        const sortSetConc = new Set(c.dezenas);
+        const dezenasOficiais = (c.dezenas || (c as any).listaDezenas || []).map((x: any) =>
+          typeof x === "number" ? x : parseInt(String(x), 10)
+        );
+        const sortSetConc = new Set(dezenasOficiais);
         const acertadas = j.dezenas.filter((d) => sortSetConc.has(d));
         const acertos = acertadas.length;
         let valorGanho = 0;
@@ -313,7 +318,7 @@ export function reconciliarJogosComConcursos(concursos: ConcursoLotofacil[]): bo
         copiaApuracoes[c.numero] = {
           concurso: c.numero,
           data: c.dataApuracao,
-          dezenasSorteadas: c.dezenas,
+          dezenasSorteadas: dezenasOficiais,
           acertos,
           dezenasAcertadas: acertadas,
           faixaPremio,

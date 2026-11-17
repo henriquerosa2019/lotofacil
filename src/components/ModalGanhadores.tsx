@@ -33,8 +33,15 @@ export default function ModalGanhadores({
 
   useEffect(() => {
     if (concurso) {
-      setConcursoEmExibicao(concurso);
-      saveHistoricoConsulta(concurso);
+      const dezenasSanitizadas = (concurso.dezenas || (concurso as any).listaDezenas || []).map((d: any) =>
+        typeof d === "number" ? d : parseInt(String(d), 10)
+      );
+      const concursoSanitizado: ConcursoLotofacil = {
+        ...concurso,
+        dezenas: dezenasSanitizadas,
+      };
+      setConcursoEmExibicao(concursoSanitizado);
+      saveHistoricoConsulta(concursoSanitizado);
       setHistoricoSalvo(getHistoricoConsultas());
     }
   }, [concurso, isOpen]);

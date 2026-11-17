@@ -22,41 +22,134 @@ export async function GET(
   try {
     const res = await fetch(
       `https://servicebus2.caixa.gov.br/portaldeloterias/api/lotofacil/${concursoNum}`,
-      { headers, cache: "no-store" }
+      { headers, cache: "no-store", signal: AbortSignal.timeout(4000) }
     );
 
     if (res.ok) {
       const data = await res.json();
-      const dezenas = (data.listaDezenas || []).map((d: string) => parseInt(d, 10));
-      return NextResponse.json(
-        {
-          sucesso: true,
-          origem: "oficial_caixa",
-          concurso: {
-            numero: data.numero,
-            dataApuracao: data.dataApuracao,
-            dezenas,
-            acumulado: data.acumulado,
-            valorArrecadado: data.valorArrecadado,
-            valorEstimadoProximoConcurso: data.valorEstimadoProximoConcurso,
-            listaRateioPremio: data.listaRateioPremio || [],
-            listaMunicipioUFGanhadores: data.listaMunicipioUFGanhadores || [],
+      if (data && data.numero) {
+        const dezenas = (data.listaDezenas || []).map((d: string) => parseInt(d, 10));
+        return NextResponse.json(
+          {
+            sucesso: true,
+            origem: "oficial_caixa",
+            concurso: {
+              numero: data.numero,
+              dataApuracao: data.dataApuracao,
+              dezenas,
+              acumulado: data.acumulado ?? false,
+              valorArrecadado: data.valorArrecadado ?? 0,
+              valorEstimadoProximoConcurso: data.valorEstimadoProximoConcurso ?? 0,
+              listaRateioPremio: data.listaRateioPremio || [],
+              listaMunicipioUFGanhadores: data.listaMunicipioUFGanhadores || [],
+            },
           },
-        },
-        {
-          headers: {
-            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
-            Pragma: "no-cache",
-            Expires: "0",
-          },
-        }
-      );
+          {
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+          }
+        );
+      }
     }
   } catch (err) {
-    console.error(`Erro ao buscar concurso ${concursoNum} na Caixa:`, err);
+    console.error(`Erro ao buscar concurso ${concursoNum} na Caixa oficial:`, err);
   }
 
-  // 2. Tenta base histórica local seed
+  // 2. Fallback A: Espelho oficial Guidi (mesma estrutura oficial Caixa)
+  try {
+    const resGuidi = await fetch(
+      `https://api.guidi.dev.br/loteria/lotofacil/${concursoNum}`,
+      { headers, cache: "no-store", signal: AbortSignal.timeout(4000) }
+    );
+
+    if (resGuidi.ok) {
+      const dataG = await resGuidi.json();
+      if (dataG && dataG.numero) {
+        const dezenas = (dataG.listaDezenas || []).map((d: string) => parseInt(d, 10));
+        return NextResponse.json(
+          {
+            sucesso: true,
+            origem: "mirror_guidi",
+            concurso: {
+              numero: dataG.numero,
+              dataApuracao: dataG.dataApuracao,
+              dezenas,
+              acumulado: dataG.acumulado ?? false,
+              valorArrecadado: dataG.valorArrecadado ?? 0,
+              valorEstimadoProximoConcurso: dataG.valorEstimadoProximoConcurso ?? 0,
+              listaRateioPremio: dataG.listaRateioPremio || [],
+              listaMunicipioUFGanhadores: dataG.listaMunicipioUFGanhadores || [],
+            },
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+          }
+        );
+      }
+    }
+  } catch (errG) {
+    console.error(`Erro fallback Guidi para concurso ${concursoNum}:`, errG);
+  }
+
+  // 3. Fallback B: API pública Heroku
+  try {
+    const resHeroku = await fetch(
+      `https://loteriascaixa-api.herokuapp.com/api/lotofacil/${concursoNum}`,
+      { headers, cache: "no-store", signal: AbortSignal.timeout(4000) }
+    );
+
+    if (resHeroku.ok) {
+      const dH = await resHeroku.json();
+      if (dH && (dH.concurso || dH.numero)) {
+        const numFinal = dH.concurso || dH.numero;
+        const dezenas = (dH.dezenas || []).map((d: string) => parseInt(d, 10));
+        return NextResponse.json(
+          {
+            sucesso: true,
+            origem: "fallback_heroku",
+            concurso: {
+              numero: numFinal,
+              dataApuracao: dH.data || dH.dataApuracao,
+              dezenas,
+              acumulado: dH.acumulou ?? false,
+              valorArrecadado: dH.valorArrecadado ?? 0,
+              valorEstimadoProximoConcurso: dH.valorEstimadoProximoConcurso ?? 0,
+              listaRateioPremio: (dH.premiacoes || []).map((p: any, idx: number) => ({
+                descricaoFaixa: p.descricao,
+                faixa: p.faixa || idx + 1,
+                numeroDeGanhadores: p.ganhadores,
+                valorPremio: p.valorPremio,
+              })),
+              listaMunicipioUFGanhadores: (dH.localGanhadores || []).map((l: any, i: number) => ({
+                ganhadores: l.ganhadores || 1,
+                municipio: l.municipio,
+                uf: l.uf,
+                posicao: i + 1,
+              })),
+            },
+          },
+          {
+            headers: {
+              "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+              Pragma: "no-cache",
+              Expires: "0",
+            },
+          }
+        );
+      }
+    }
+  } catch (errH) {
+    console.error(`Erro fallback Heroku para concurso ${concursoNum}:`, errH);
+  }
+
+  // 4. Fallback C: base histórica local seed
   const found = historicalSeed.find((c) => c.numero === concursoNum) as any;
   if (found) {
     return NextResponse.json({
@@ -80,8 +173,14 @@ export async function GET(
             ],
         listaMunicipioUFGanhadores: found.listaMunicipioUFGanhadores || [],
       },
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0",
+        Pragma: "no-cache",
+        Expires: "0",
+      },
     });
   }
 
-  return NextResponse.json({ erro: "Concurso não encontrado" }, { status: 404 });
+  return NextResponse.json({ erro: `Concurso ${concursoNum} não localizado ou ainda não apurado pela Caixa.` }, { status: 404 });
 }

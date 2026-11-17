@@ -170,7 +170,7 @@ export default function Home() {
 
   // Quantidade de concursos jogados pelo usuário que já foram apurados
   const concursosJogadosApuradosCount = useMemo(() => {
-    const ultimoNum = ultimoConcurso?.numero || (historico.length > 0 ? historico[historico.length - 1].numero : 3826);
+    const ultimoNum = ultimoConcurso?.numero || (historico.length > 0 ? historico[historico.length - 1].numero : 3831);
     const concursosSet = new Set<number>();
     jogos.forEach((j) => {
       const fim = Math.min(j.concursoFinal, ultimoNum);
@@ -254,9 +254,10 @@ export default function Home() {
   };
 
   /**
-   * Ao clicar no "olhinho" (Ganhadores) em Meus Jogos Registrados:
-   * Busca os dados completos do concurso na Caixa (ou cache),
-   * listando todos os ganhadores, locais (cidades/UF) e valores pagos.
+   * Ao clicar no "olhinho" (Ganhadores) em Meus Jogos Registrados ou fornecer um concurso específico:
+   * Busca os dados completos do concurso na Caixa (ou nos espelhos de alta disponibilidade),
+   * listando todos os ganhadores, locais (cidades/UF), rateio e valores pagos.
+   * Adiciona o concurso ao histórico e atualiza a apuração dos bilhetes.
    */
   const handleAbrirGanhadoresEspecifico = async (concursoParam: ConcursoLotofacil | number) => {
     const num = typeof concursoParam === "number" ? concursoParam : concursoParam.numero;
@@ -267,11 +268,11 @@ export default function Home() {
       concCompleto = ultimoConcurso;
     }
 
-    // 2. Busca na API oficial pelo número do concurso para trazer cidades e rateio completo
+    // 2. Busca na API local Next.js (com multi-tier: Caixa -> Guidi -> Heroku -> Seed)
     if (!concCompleto) {
       try {
         setLoadingApi(true);
-        const res = await fetch(`/api/lotofacil/${num}`);
+        const res = await fetch(`/api/lotofacil/${num}?t=${Date.now()}`, { cache: "no-store" });
         if (res.ok) {
           const data = await res.json();
           if (data.sucesso && data.concurso) {
@@ -279,23 +280,120 @@ export default function Home() {
           }
         }
       } catch (err) {
-        console.error(`Erro ao buscar dados completos do concurso ${num}:`, err);
+        console.warn(`Tentando fallback direto no cliente para concurso ${num}...`, err);
       } finally {
         setLoadingApi(false);
       }
     }
 
-    // 3. Fallback se a API falhar: verifica no histórico local
+    // 3. Fallback direto no cliente: Espelho Guidi (Alta Disponibilidade com Rateio e Cidades)
+    if (!concCompleto) {
+      try {
+        setLoadingApi(true);
+        const resG = await fetch(`https://api.guidi.dev.br/loteria/lotofacil/${num}`, {
+          headers: { Accept: "application/json" },
+        });
+        if (resG.ok) {
+          const gData = await resG.json();
+          if (gData && (gData.numero || gData.listaDezenas)) {
+            const dezenas = (gData.listaDezenas || []).map((x: any) => parseInt(String(x), 10));
+            concCompleto = {
+              numero: gData.numero,
+              dataApuracao: gData.dataApuracao,
+              dezenas,
+              acumulado: gData.acumulado ?? false,
+              valorArrecadado: gData.valorArrecadado ?? 0,
+              valorEstimadoProximoConcurso: gData.valorEstimadoProximoConcurso ?? 0,
+              listaRateioPremio: gData.listaRateioPremio || [],
+              listaMunicipioUFGanhadores: gData.listaMunicipioUFGanhadores || [],
+            };
+          }
+        }
+      } catch (errG) {
+        console.warn(`Tentando fallback direto Heroku para concurso ${num}...`, errG);
+      } finally {
+        setLoadingApi(false);
+      }
+    }
+
+    // 4. Fallback direto no cliente: API pública Heroku
+    if (!concCompleto) {
+      try {
+        setLoadingApi(true);
+        const resH = await fetch(`https://loteriascaixa-api.herokuapp.com/api/lotofacil/${num}`);
+        if (resH.ok) {
+          const hData = await resH.json();
+          if (hData && (hData.concurso || hData.dezenas)) {
+            const dezenas = (hData.dezenas || []).map((d: any) => parseInt(String(d), 10));
+            concCompleto = {
+              numero: hData.concurso,
+              dataApuracao: hData.data || "",
+              dezenas,
+              acumulado: hData.acumulou ?? false,
+              valorArrecadado: hData.arrecadacaoTotal ?? 0,
+              valorEstimadoProximoConcurso: hData.proximoEstimado ?? 0,
+              listaRateioPremio: (hData.premiacoes || []).map((p: any, idx: number) => ({
+                faixa: p.faixa || idx + 1,
+                numeroDeGanhadores: p.ganhadores || 0,
+                valorPremio: p.valorPremio || 0,
+                descricaoFaixa: p.descricao || `${p.faixa} acertos`,
+              })),
+              listaMunicipioUFGanhadores: (hData.localGanhadores || []).map((l: any, i: number) => ({
+                ganhadores: l.ganhadores || 1,
+                municipio: l.municipio || "",
+                uf: l.uf || "",
+                posicao: i + 1,
+              })),
+            };
+          }
+        }
+      } catch (errH) {
+        console.error(`Falha em todos os tiers remotos para concurso ${num}:`, errH);
+      } finally {
+        setLoadingApi(false);
+      }
+    }
+
+    // 5. Fallback histórico local (seed ou estado)
     if (!concCompleto) {
       const seedFound = historico.find((h) => h.numero === num);
-      if (seedFound) concCompleto = seedFound;
-      else if (typeof concursoParam !== "number") concCompleto = concursoParam;
+      if (seedFound) {
+        concCompleto = seedFound;
+      } else if (typeof concursoParam !== "number") {
+        concCompleto = concursoParam;
+      }
     }
 
     if (concCompleto) {
+      // Normaliza dezenas como números inteiros
+      const dezenasSanitizadas = (concCompleto.dezenas || (concCompleto as any).listaDezenas || []).map((d: any) =>
+        typeof d === "number" ? d : parseInt(String(d), 10)
+      );
+      concCompleto = {
+        ...concCompleto,
+        dezenas: dezenasSanitizadas,
+      };
+
       saveHistoricoConsulta(concCompleto);
 
-      // Apura qualquer jogo registrado que pertença a este concurso
+      // Adiciona/atualiza no estado historico
+      setHistorico((prev) => {
+        const mapa = new Map<number, ConcursoLotofacil>();
+        prev.forEach((c) => mapa.set(c.numero, c));
+        mapa.set(concCompleto!.numero, concCompleto!);
+        return Array.from(mapa.values()).sort((a, b) => a.numero - b.numero);
+      });
+
+      // Atualiza último concurso se este for mais recente
+      if (!ultimoConcurso || concCompleto.numero > ultimoConcurso.numero) {
+        setUltimoConcurso(concCompleto);
+        setStatusCaixa(getStatusApuracaoCaixa(concCompleto));
+      }
+
+      // Reconcilia e apura qualquer aposta com este concurso
+      reconciliarJogosComConcursos([concCompleto]);
+
+      // Apura jogos registrados em tela
       const jogosSalvos = getJogosRegistrados();
       let houveAlteracao = false;
       let melhorPremiado: DadosCelebracao | null = null;
@@ -333,6 +431,10 @@ export default function Home() {
 
       setModalGanhadoresConcurso(concCompleto);
       setModalGanhadoresAberto(true);
+    } else {
+      alert(
+        `Concurso ${num} não localizado na Caixa Econômica Federal.\n\nVerifique se o número foi digitado corretamente ou se a apuração oficial ainda não foi concluída pela Caixa.`
+      );
     }
   };
 

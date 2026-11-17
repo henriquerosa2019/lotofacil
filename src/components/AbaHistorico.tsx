@@ -65,7 +65,7 @@ export default function AbaHistorico({
   }, [jogos]);
 
   // Último concurso apurado pela Caixa
-  const ultimoNumeroApurado = ultimoConcurso?.numero || (historico.length > 0 ? historico[historico.length - 1].numero : 3826);
+  const ultimoNumeroApurado = ultimoConcurso?.numero || (historico.length > 0 ? historico[historico.length - 1].numero : 3831);
 
   // 1. CONCURSOS DO USUÁRIO JÁ APURADOS PELA CAIXA (do menor concurso jogado >= 3820 até o último apurado)
   const concursosApuradosUsuario = useMemo(() => {

@@ -177,8 +177,32 @@ export async function preencherLacunasConcursos(
           if (d.sucesso && d.concurso) {
             mapa.set(num, d.concurso);
             adicionados.push(d.concurso);
+            continue;
           }
         }
+
+        // Fallback direto no cliente para Guidi Mirror
+        try {
+          const resG = await fetch(`https://api.guidi.dev.br/loteria/lotofacil/${num}`);
+          if (resG.ok) {
+            const gData = await resG.json();
+            if (gData && (gData.numero || gData.listaDezenas)) {
+              const dezenas = (gData.listaDezenas || []).map((x: any) => parseInt(String(x), 10));
+              const item: ConcursoLotofacil = {
+                numero: gData.numero,
+                dataApuracao: gData.dataApuracao,
+                dezenas,
+                acumulado: gData.acumulado ?? false,
+                valorArrecadado: gData.valorArrecadado ?? 0,
+                valorEstimadoProximoConcurso: gData.valorEstimadoProximoConcurso ?? 0,
+                listaRateioPremio: gData.listaRateioPremio || [],
+                listaMunicipioUFGanhadores: gData.listaMunicipioUFGanhadores || [],
+              };
+              mapa.set(num, item);
+              adicionados.push(item);
+            }
+          }
+        } catch {}
       } catch (err) {
         console.error(`Erro ao preencher lacuna do concurso ${num}:`, err);
       }
