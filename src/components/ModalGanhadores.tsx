@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { X, Trophy, MapPin, Users, DollarSign, Calendar, History, Trash2, CheckCircle2, AlertCircle, Sparkles, Wallet } from "lucide-react";
+import { X, Trophy, MapPin, Users, DollarSign, Calendar, History, Trash2, CheckCircle2, AlertCircle, Sparkles, Wallet, ShieldCheck, ExternalLink } from "lucide-react";
 import { ConcursoLotofacil, HistoricoConsultaConcurso, JogoRegistrado } from "@/lib/types";
 import { saveHistoricoConsulta, getHistoricoConsultas, deleteHistoricoConsulta } from "@/lib/storage";
 import { DadosCelebracao } from "./CelebracaoVitoria";
@@ -114,10 +114,26 @@ export default function ModalGanhadores({
               <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
                 <span>Resultado Oficial Caixa — Concurso {concursoEmExibicao.numero}</span>
               </h3>
-              <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
-                <Calendar className="w-3.5 h-3.5" />
-                Data de Apuração: {concursoEmExibicao.dataApuracao}
-              </p>
+              <div className="flex flex-wrap items-center gap-2 mt-1">
+                <span className="text-xs text-gray-400 flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5" />
+                  {concursoEmExibicao.dataApuracao}
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  Site Oficial da Caixa Econômica Federal
+                </span>
+                <a
+                  href="https://loterias.caixa.gov.br/Paginas/Lotofacil.aspx"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-purple-300 hover:text-purple-100 flex items-center gap-1 hover:underline"
+                  title="Abrir página oficial da Lotofácil no portal Loterias Caixa"
+                >
+                  <span>loterias.caixa.gov.br</span>
+                  <ExternalLink className="w-2.5 h-2.5 text-purple-400" />
+                </a>
+              </div>
             </div>
           </div>
 
@@ -255,15 +271,21 @@ export default function ModalGanhadores({
                   </div>
 
                   {jogosDesteConcurso.map((jogo) => {
-                    const sortSet = new Set(concursoEmExibicao.dezenas);
-                    const acertadas = jogo.dezenas.filter((d) => sortSet.has(d));
+                    const dezenasOficiais = (concursoEmExibicao.dezenas || (concursoEmExibicao as any).listaDezenas || [])
+                      .map((x: any) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+                      .filter((n: number) => !isNaN(n));
+                    const jogoDezenas = (jogo.dezenas || [])
+                      .map((x: any) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+                      .filter((n: number) => !isNaN(n));
+                    const sortSet = new Set(dezenasOficiais);
+                    const acertadas = jogoDezenas.filter((d) => sortSet.has(d));
                     const acertos = acertadas.length;
 
                     let valorGanho = 0;
                     if (acertos === 15) {
                       valorGanho = faixa15?.valorPremio || 2000000;
                     } else if (acertos === 14) {
-                      const f14 = concursoEmExibicao.listaRateioPremio?.find((f) => f.faixa === 2);
+                      const f14 = concursoEmExibicao.listaRateioPremio?.find((f) => Number(f.faixa) === 2);
                       valorGanho = f14?.valorPremio || 1500;
                     } else if (acertos === 13) valorGanho = 35;
                     else if (acertos === 12) valorGanho = 14;
@@ -344,7 +366,7 @@ export default function ModalGanhadores({
                             Suas 15 dezenas (acertos em verde esmeralda):
                           </span>
                           <div className="flex flex-wrap gap-1.5">
-                            {jogo.dezenas.map((d) => {
+                            {jogoDezenas.map((d) => {
                               const acertou = sortSet.has(d);
                               return (
                                 <span
@@ -388,7 +410,11 @@ export default function ModalGanhadores({
                   15 Dezenas Sorteadas no Concurso {concursoEmExibicao.numero}:
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {concursoEmExibicao.dezenas.map((d) => (
+                  {(
+                    (concursoEmExibicao.dezenas || (concursoEmExibicao as any).listaDezenas || []).map((x: any) =>
+                      typeof x === "number" ? x : parseInt(String(x), 10)
+                    ).filter((n: number) => !isNaN(n))
+                  ).map((d: number) => (
                     <span
                       key={d}
                       className="w-8 h-8 rounded-lg bg-emerald-600/20 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center font-mono"

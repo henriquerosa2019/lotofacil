@@ -19,6 +19,8 @@ export interface ConcursoLotofacil {
     serie?: string;
     nomeFatansiaUL?: string;
   }>;
+  origem?: string;
+  urlOficial?: string;
 }
 
 export interface HistoricoConsultaConcurso {
@@ -32,6 +34,8 @@ export interface HistoricoConsultaConcurso {
   totalPremiosPagos?: number;
   totalGanhadores?: number;
   valorArrecadado?: number;
+  origem?: string;
+  urlOficial?: string;
   cidadesGanhadores: Array<{
     ganhadores: number;
     municipio: string;

@@ -111,17 +111,17 @@ export default function Header({
               className="ml-1.5 flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-700 to-fuchsia-600 hover:from-purple-600 hover:to-fuchsia-500 text-white font-bold text-xs transition-all cursor-pointer shadow-md shadow-purple-900/40 group active:scale-95"
               title={
                 concursoInput.trim()
-                  ? `Clique para aferir oficialmente o Concurso ${concursoInput.trim()} na Caixa`
-                  : `Clique para aferir o último concurso apurado pela Caixa${ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}`
+                  ? `Clique para aferir diretamente no Site Oficial da Caixa o Concurso ${concursoInput.trim()}`
+                  : `Clique para aferir diretamente no Site Oficial da Caixa o último concurso${ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}`
               }
             >
               <Trophy className="w-3.5 h-3.5 text-amber-300 group-hover:scale-110 transition-transform shrink-0" />
               <span>
                 {concursoInput.trim() ? (
-                  <>Aferir C.{concursoInput.trim()}</>
+                  <>Aferir C.{concursoInput.trim()} (Oficial Caixa)</>
                 ) : (
                   <>
-                    <strong>★ Ver Resultado (Caixa)</strong>
+                    <strong>★ Aferir no Site Oficial Caixa</strong>
                     {ultimoConcurso ? ` (C.${ultimoConcurso.numero})` : ""}
                   </>
                 )}

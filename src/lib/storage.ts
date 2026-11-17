@@ -235,6 +235,8 @@ export function saveHistoricoConsulta(c: ConcursoLotofacil): void {
     totalPremiosPagos: totalPremios,
     totalGanhadores: totalGanhadores,
     valorArrecadado: c.valorArrecadado,
+    origem: c.origem || "Site Oficial da Caixa Econômica Federal",
+    urlOficial: c.urlOficial || "https://loterias.caixa.gov.br/Paginas/Lotofacil.aspx",
     cidadesGanhadores: (c.listaMunicipioUFGanhadores || []).map((m) => ({
       municipio: m.municipio,
       uf: m.uf,
@@ -286,46 +288,57 @@ export function reconciliarJogosComConcursos(concursos: ConcursoLotofacil[]): bo
     const copiaApuracoes = { ...j.apuracoes };
 
     concursos.forEach((c) => {
-      const apExistente = copiaApuracoes[c.numero];
-      const precisaApurar = !apExistente || !apExistente.dezenasSorteadas || apExistente.dezenasSorteadas.length === 0;
+      const dezenasOficiais = (c.dezenas || (c as any).listaDezenas || [])
+        .map((x: any) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+        .filter((n: number) => !isNaN(n));
+
+      const jogoDezenas = (j.dezenas || [])
+        .map((x: any) => (typeof x === "number" ? x : parseInt(String(x), 10)))
+        .filter((n: number) => !isNaN(n));
 
       if (
         c.numero >= j.concursoInicial &&
         c.numero <= j.concursoFinal &&
-        precisaApurar
+        dezenasOficiais.length === 15
       ) {
-        const dezenasOficiais = (c.dezenas || (c as any).listaDezenas || []).map((x: any) =>
-          typeof x === "number" ? x : parseInt(String(x), 10)
-        );
         const sortSetConc = new Set(dezenasOficiais);
-        const acertadas = j.dezenas.filter((d) => sortSetConc.has(d));
+        const acertadas = jogoDezenas.filter((d) => sortSetConc.has(d));
         const acertos = acertadas.length;
         let valorGanho = 0;
         let faixaPremio = "Não premiado";
 
         if (acertos === 15) {
-          const f = c.listaRateioPremio?.find((r) => r.faixa === 1);
+          const f = c.listaRateioPremio?.find((r) => Number(r.faixa) === 1);
           valorGanho = f?.valorPremio || 2000000.0;
           faixaPremio = "15 ACERTOS (PRÊMIO MÁXIMO!)";
         } else if (acertos === 14) {
-          const f = c.listaRateioPremio?.find((r) => r.faixa === 2);
+          const f = c.listaRateioPremio?.find((r) => Number(r.faixa) === 2);
           valorGanho = f?.valorPremio || 1500.0;
           faixaPremio = "14 Acertos";
         } else if (acertos === 13) valorGanho = 35.0;
         else if (acertos === 12) valorGanho = 14.0;
         else if (acertos === 11) valorGanho = 7.0;
 
-        copiaApuracoes[c.numero] = {
-          concurso: c.numero,
-          data: c.dataApuracao,
-          dezenasSorteadas: dezenasOficiais,
-          acertos,
-          dezenasAcertadas: acertadas,
-          faixaPremio,
-          valorGanho,
-          apuradoEm: "Oficial Caixa",
-        };
-        jogoModificado = true;
+        const apExistente = copiaApuracoes[c.numero];
+        if (
+          !apExistente ||
+          apExistente.acertos !== acertos ||
+          apExistente.valorGanho !== valorGanho ||
+          !apExistente.dezenasSorteadas ||
+          apExistente.dezenasSorteadas.length !== 15
+        ) {
+          copiaApuracoes[c.numero] = {
+            concurso: c.numero,
+            data: c.dataApuracao,
+            dezenasSorteadas: dezenasOficiais,
+            acertos,
+            dezenasAcertadas: acertadas,
+            faixaPremio,
+            valorGanho,
+            apuradoEm: "Oficial Caixa",
+          };
+          jogoModificado = true;
+        }
       }
     });
 

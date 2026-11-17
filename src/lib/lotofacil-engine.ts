@@ -484,8 +484,17 @@ export function apurarJogoComConcurso(
     };
   }
 
-  const sortSet = new Set(concurso.dezenas);
-  const acertadas = jogo.dezenas.filter((d) => sortSet.has(d));
+  const rawDezenas = concurso.dezenas || (concurso as any).listaDezenas || [];
+  const dezenasOficiais = rawDezenas
+    .map((d: any) => (typeof d === "number" ? d : parseInt(String(d), 10)))
+    .filter((n: number) => !isNaN(n));
+
+  const jogoDezenas = (jogo.dezenas || [])
+    .map((d: any) => (typeof d === "number" ? d : parseInt(String(d), 10)))
+    .filter((n: number) => !isNaN(n));
+
+  const sortSet = new Set(dezenasOficiais);
+  const acertadas = jogoDezenas.filter((d) => sortSet.has(d));
   const acertos = acertadas.length;
 
   let valorGanho = 0;
@@ -493,11 +502,11 @@ export function apurarJogoComConcurso(
 
   if (acertos >= 11) {
     if (acertos === 15) {
-      const f = concurso.listaRateioPremio?.find((r) => r.faixa === 1);
+      const f = concurso.listaRateioPremio?.find((r) => Number(r.faixa) === 1);
       valorGanho = f?.valorPremio || 2000000.0;
       faixaPremio = "15 ACERTOS (PRÊMIO MÁXIMO!)";
     } else if (acertos === 14) {
-      const f = concurso.listaRateioPremio?.find((r) => r.faixa === 2);
+      const f = concurso.listaRateioPremio?.find((r) => Number(r.faixa) === 2);
       valorGanho = f?.valorPremio || 1500.0;
       faixaPremio = "14 Acertos";
     } else if (acertos === 13) {
@@ -517,7 +526,7 @@ export function apurarJogoComConcurso(
     [concurso.numero]: {
       concurso: concurso.numero,
       data: concurso.dataApuracao,
-      dezenasSorteadas: concurso.dezenas,
+      dezenasSorteadas: dezenasOficiais,
       acertos,
       dezenasAcertadas: acertadas,
       faixaPremio,

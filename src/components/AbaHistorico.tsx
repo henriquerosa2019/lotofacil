@@ -174,13 +174,16 @@ export default function AbaHistorico({
       <div className="p-5 md:p-6 rounded-2xl bg-gradient-to-r from-[#121827] via-[#151c30] to-[#121827] border border-purple-500/40 shadow-xl space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-800 pb-4">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 rounded text-[10px] font-bold bg-purple-600 text-white uppercase tracking-wider flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 Histórico Pessoal de Apostas
               </span>
               <span className="text-xs text-amber-300 font-semibold font-mono">
                 Teimosinha Ativa: Concursos {metricasTeimosinha.inicioConcurso} até {metricasTeimosinha.fimConcurso}
+              </span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                ✓ Apuração Oficial Site da Caixa
               </span>
             </div>
             <h2 className="text-lg md:text-xl font-bold text-white mt-1 flex items-center gap-2">

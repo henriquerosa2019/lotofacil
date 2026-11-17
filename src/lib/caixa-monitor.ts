@@ -175,8 +175,13 @@ export async function preencherLacunasConcursos(
         if (res.ok) {
           const d = await res.json();
           if (d.sucesso && d.concurso) {
-            mapa.set(num, d.concurso);
-            adicionados.push(d.concurso);
+            const concOficial: ConcursoLotofacil = {
+              ...d.concurso,
+              origem: d.concurso.origem || "Site Oficial da Caixa Econômica Federal",
+              urlOficial: "https://loterias.caixa.gov.br/Paginas/Lotofacil.aspx",
+            };
+            mapa.set(num, concOficial);
+            adicionados.push(concOficial);
             continue;
           }
         }

@@ -25,6 +25,8 @@ import {
   Wallet,
   X,
   Zap,
+  ShieldCheck,
+  ExternalLink,
 } from "lucide-react";
 
 interface AbaAfericaoProps {
@@ -736,15 +738,26 @@ export default function AbaAfericao({
       {/* PAINEL DE AFERIÇÃO OFICIAL POR NÚMERO DE CONCURSO */}
       <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-gray-900 via-[#141a2c] to-gray-900 border border-purple-500/30 shadow-lg space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-800 pb-2.5">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Search className="w-4 h-4 text-purple-400" />
             <h3 className="text-sm font-bold text-white">
-              Aferição Oficial Caixa por Número de Concurso
+              Aferição no Site Oficial da Caixa
             </h3>
+            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+              Site Oficial Caixa
+            </span>
           </div>
-          <span className="text-xs text-gray-400">
-            Forneça o concurso desejado ou clique em um atalho recente
-          </span>
+          <a
+            href="https://loterias.caixa.gov.br/Paginas/Lotofacil.aspx"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-purple-300 hover:text-purple-100 flex items-center gap-1 hover:underline"
+            title="Acessar portal oficial das Loterias Caixa"
+          >
+            <span>loterias.caixa.gov.br</span>
+            <ExternalLink className="w-3 h-3 text-purple-400" />
+          </a>
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
@@ -771,7 +784,7 @@ export default function AbaAfericao({
               className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-purple-900/30 transition-all cursor-pointer active:scale-95 flex-1 sm:flex-initial"
             >
               <Search className="w-3.5 h-3.5" />
-              <span>{concursoParaAferir.trim() ? `Aferir C.${concursoParaAferir.trim()}` : "Aferir Último Concurso"}</span>
+              <span>{concursoParaAferir.trim() ? `Aferir C.${concursoParaAferir.trim()} na Caixa` : "Aferir no Site Oficial Caixa"}</span>
             </button>
 
             <button

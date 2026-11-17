@@ -78,7 +78,11 @@ export default function Home() {
       if (res.ok) {
         const data = await res.json();
         if (data.sucesso && data.concurso) {
-          const concCaixa: ConcursoLotofacil = data.concurso;
+          const concCaixa: ConcursoLotofacil = {
+            ...data.concurso,
+            origem: data.concurso.origem || "Site Oficial da Caixa Econômica Federal",
+            urlOficial: "https://loterias.caixa.gov.br/Paginas/Lotofacil.aspx",
+          };
           setUltimoConcurso(concCaixa);
           saveHistoricoConsulta(concCaixa);
 
@@ -268,7 +272,7 @@ export default function Home() {
       concCompleto = ultimoConcurso;
     }
 
-    // 2. Busca na API local Next.js (com multi-tier: Caixa -> Guidi -> Heroku -> Seed)
+    // 2. Busca diretamente no Site Oficial da Caixa (via API proxy local com headers oficiais e retry)
     if (!concCompleto) {
       try {
         setLoadingApi(true);
@@ -280,81 +284,13 @@ export default function Home() {
           }
         }
       } catch (err) {
-        console.warn(`Tentando fallback direto no cliente para concurso ${num}...`, err);
+        console.warn(`Erro na consulta oficial da Caixa para concurso ${num}:`, err);
       } finally {
         setLoadingApi(false);
       }
     }
 
-    // 3. Fallback direto no cliente: Espelho Guidi (Alta Disponibilidade com Rateio e Cidades)
-    if (!concCompleto) {
-      try {
-        setLoadingApi(true);
-        const resG = await fetch(`https://api.guidi.dev.br/loteria/lotofacil/${num}`, {
-          headers: { Accept: "application/json" },
-        });
-        if (resG.ok) {
-          const gData = await resG.json();
-          if (gData && (gData.numero || gData.listaDezenas)) {
-            const dezenas = (gData.listaDezenas || []).map((x: any) => parseInt(String(x), 10));
-            concCompleto = {
-              numero: gData.numero,
-              dataApuracao: gData.dataApuracao,
-              dezenas,
-              acumulado: gData.acumulado ?? false,
-              valorArrecadado: gData.valorArrecadado ?? 0,
-              valorEstimadoProximoConcurso: gData.valorEstimadoProximoConcurso ?? 0,
-              listaRateioPremio: gData.listaRateioPremio || [],
-              listaMunicipioUFGanhadores: gData.listaMunicipioUFGanhadores || [],
-            };
-          }
-        }
-      } catch (errG) {
-        console.warn(`Tentando fallback direto Heroku para concurso ${num}...`, errG);
-      } finally {
-        setLoadingApi(false);
-      }
-    }
-
-    // 4. Fallback direto no cliente: API pública Heroku
-    if (!concCompleto) {
-      try {
-        setLoadingApi(true);
-        const resH = await fetch(`https://loteriascaixa-api.herokuapp.com/api/lotofacil/${num}`);
-        if (resH.ok) {
-          const hData = await resH.json();
-          if (hData && (hData.concurso || hData.dezenas)) {
-            const dezenas = (hData.dezenas || []).map((d: any) => parseInt(String(d), 10));
-            concCompleto = {
-              numero: hData.concurso,
-              dataApuracao: hData.data || "",
-              dezenas,
-              acumulado: hData.acumulou ?? false,
-              valorArrecadado: hData.arrecadacaoTotal ?? 0,
-              valorEstimadoProximoConcurso: hData.proximoEstimado ?? 0,
-              listaRateioPremio: (hData.premiacoes || []).map((p: any, idx: number) => ({
-                faixa: p.faixa || idx + 1,
-                numeroDeGanhadores: p.ganhadores || 0,
-                valorPremio: p.valorPremio || 0,
-                descricaoFaixa: p.descricao || `${p.faixa} acertos`,
-              })),
-              listaMunicipioUFGanhadores: (hData.localGanhadores || []).map((l: any, i: number) => ({
-                ganhadores: l.ganhadores || 1,
-                municipio: l.municipio || "",
-                uf: l.uf || "",
-                posicao: i + 1,
-              })),
-            };
-          }
-        }
-      } catch (errH) {
-        console.error(`Falha em todos os tiers remotos para concurso ${num}:`, errH);
-      } finally {
-        setLoadingApi(false);
-      }
-    }
-
-    // 5. Fallback histórico local (seed ou estado)
+    // 3. Fallback no histórico local
     if (!concCompleto) {
       const seedFound = historico.find((h) => h.numero === num);
       if (seedFound) {
@@ -365,13 +301,15 @@ export default function Home() {
     }
 
     if (concCompleto) {
-      // Normaliza dezenas como números inteiros
+      // Normaliza dezenas como números inteiros e fixa a fonte oficial Caixa
       const dezenasSanitizadas = (concCompleto.dezenas || (concCompleto as any).listaDezenas || []).map((d: any) =>
         typeof d === "number" ? d : parseInt(String(d), 10)
       );
       concCompleto = {
         ...concCompleto,
         dezenas: dezenasSanitizadas,
+        origem: concCompleto.origem || "Site Oficial da Caixa Econômica Federal",
+        urlOficial: "https://loterias.caixa.gov.br/Paginas/Lotofacil.aspx",
       };
 
       saveHistoricoConsulta(concCompleto);
